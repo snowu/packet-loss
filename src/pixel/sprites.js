@@ -2,6 +2,7 @@
 // traffic, clouds. Facades and skyline towers live in city.js. Everything is drawn into PixelBuffers with the current palette.
 import { PixelBuffer, pack, mix, hash, dither } from './pixels.js'
 import { ACCENT } from './palette.js'
+import { withOverride } from './overrides.js'
 
 export const PPU = 14              // pixels per meter
 export const FACADE_DEPTH = 26     // meters of facade below a roof line
@@ -64,7 +65,7 @@ export function bakeCar(dir, pal, seed) {
   b.rect(2, 3, 5, 1, under)
   b.set(dir > 0 ? 8 : 0, 1, pack([255, 250, 220]))
   b.set(dir > 0 ? 0 : 8, 1, pack([255, 40, 40]))
-  return b
+  return withOverride(dir > 0 ? 'car_right' : 'car_left', b)
 }
 
 // Push decor colors toward the backdrop so foreground obstacles read first.
@@ -81,7 +82,19 @@ export function recede(b, color, t) {
 // ── decor standing on roofs ─────────────────────────────────────────────
 
 // classic: the sign as it was before the clarity pass (panel at torso height)
-export function bakeDecor(type, variant, pal, { classic = false } = {}) {
+// Art IDs for decor an artist can redraw (fixed size whatever the variant). The
+// antenna's height varies, so it stays code-only.
+const DECOR_ART = new Set(['tank', 'ac', 'dish', 'skylight', 'vents', 'solar'])
+export const signArtId = (brand) => 'sign_' + brand.toLowerCase().replace(/\W+/g, '')
+
+export function bakeDecor(type, variant, pal, opts = {}) {
+  const b = drawDecor(type, variant, pal, opts)
+  if (DECOR_ART.has(type)) return withOverride(type, b)
+  if (type === 'sign' && !opts.classic) return withOverride(signArtId(BRANDS[Math.floor(variant * BRANDS.length)]), b)
+  return b
+}
+
+function drawDecor(type, variant, pal, { classic = false } = {}) {
   const metal = tones(mix(pal.roof, [120, 130, 145], 0.45), pal)
   const dark = pack(mix(pal.shadow, [25, 25, 35], 0.3))
   if (type === 'tank') {
@@ -177,7 +190,7 @@ export function bakeBird(frame) {
   if (frame === 0) { b.rect(1, 1, 3, 1, c); b.set(4, 0, c) }
   else if (frame === 1) { b.set(0, 0, c); b.set(1, 1, c); b.set(2, 1, c); b.set(3, 0, c); b.set(4, 0, c) }
   else { b.set(0, 2, c); b.set(1, 1, c); b.set(2, 1, c); b.set(3, 2, c) }
-  return b
+  return withOverride(`bird_${frame}`, b)
 }
 
 export function bakeCloud(w, h, pal, seed) {

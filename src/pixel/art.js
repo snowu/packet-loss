@@ -1,6 +1,7 @@
 // Hand-drawn pixel art and lettering for advertising: product and mascot
 // sprites, a 5x7 display font, and procedurally built faux-kanji.
 import { pack, mix, hash } from './pixels.js'
+import { peekOverride } from './overrides.js'
 
 // ── sprites ──────────────────────────────────────────────────────────────
 // Keys: k outline · a hue · b hue shade · c hue light · w white · W white shade
@@ -234,6 +235,12 @@ export function artColors(hue, pal, hair) {
 export function drawArt(b, name, x, y, colors, scale = 1, flip = false) {
   const rows = ART[name]
   const w = rows[0].length
+  // an artist's PNG keeps its own colours instead of the billboard's hue
+  const o = peekOverride(name, w, rows.length)
+  if (o) {
+    for (let ry = 0; ry < o.h; ry++) for (let rx = 0; rx < w; rx++) { const c = o.data[ry * w + (flip ? w - 1 - rx : rx)]; if (c >>> 24) b.rect(x + rx * scale, y + ry * scale, scale, scale, c) }
+    return
+  }
   rows.forEach((row, ry) => {
     for (let rx = 0; rx < w; rx++) {
       const c = colors[row[flip ? w - 1 - rx : rx]]

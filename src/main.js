@@ -12,6 +12,7 @@ import { Input } from './input.js'
 import { Audio } from './audio.js'
 import { Hud, formatTime, medalFor } from './ui/hud.js'
 import { PixelView } from './pixel/view.js'
+import { loadArtOverrides } from './pixel/overrides.js'
 import { PALETTE_NAMES, pinPalette } from './pixel/palette.js'
 import { RUNNERS, RUNNER_STYLES } from './pixel/runner.js'
 import { localLab } from './lab/local.js'
@@ -34,6 +35,8 @@ const isTouch = window.matchMedia('(pointer: coarse)').matches && navigator.maxT
 const params = new URLSearchParams(location.search)
 const fixedSeed = params.has('seed') ? Number(params.get('seed')) : null
 
+// artist PNGs (public/art) must be in before the first sprite is baked and cached
+await loadArtOverrides()
 const view = new PixelView()
 const input = new Input()
 const audio = new Audio()

@@ -8,6 +8,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'idle'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -20,6 +21,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'run'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -32,6 +34,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'sprint'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -44,6 +47,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'jump'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -56,6 +60,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'apex'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -68,6 +73,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'fall'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -80,6 +86,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'slide'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -92,6 +99,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'roll'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -104,6 +112,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'vault'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -116,6 +125,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'climb'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -128,6 +138,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'wallrun'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -140,6 +151,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'zipline'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -152,6 +164,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'mantle'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -164,6 +177,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') posed 'stumble'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -176,6 +190,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 0/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -189,6 +204,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 1/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -202,6 +218,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 2/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -215,6 +232,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 3/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -228,6 +246,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 4/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -241,6 +260,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 5/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -254,6 +274,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 6/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -267,6 +288,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') run cycle frame 7/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -280,6 +302,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 0/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -293,6 +316,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 1/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -306,6 +330,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 2/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -319,6 +344,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 3/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -332,6 +358,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 4/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -345,6 +372,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 5/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -358,6 +386,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 6/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -371,6 +400,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('courier') sprint cycle frame 7/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -384,6 +414,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'idle'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -396,6 +427,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'run'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -408,6 +440,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'sprint'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -420,6 +453,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'jump'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -432,6 +466,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'apex'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -444,6 +479,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'fall'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -456,6 +492,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'slide'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -468,6 +505,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'roll'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -480,6 +518,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'vault'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -492,6 +531,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'climb'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -504,6 +544,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'wallrun'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -516,6 +557,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'zipline'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -528,6 +570,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'mantle'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -540,6 +583,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') posed 'stumble'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -552,6 +596,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 0/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -565,6 +610,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 1/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -578,6 +624,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 2/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -591,6 +638,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 3/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -604,6 +652,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 4/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -617,6 +666,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 5/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -630,6 +680,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 6/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -643,6 +694,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') run cycle frame 7/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -656,6 +708,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 0/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -669,6 +722,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 1/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -682,6 +736,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 2/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -695,6 +750,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 3/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -708,6 +764,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 4/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -721,6 +778,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 5/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -734,6 +792,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 6/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -747,6 +806,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('windbreaker') sprint cycle frame 7/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -760,6 +820,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'idle'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -772,6 +833,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'run'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -784,6 +846,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'sprint'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -796,6 +859,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'jump'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -808,6 +872,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'apex'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -820,6 +885,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'fall'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -832,6 +898,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'slide'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -844,6 +911,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'roll'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -856,6 +924,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'vault'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -868,6 +937,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'climb'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -880,6 +950,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'wallrun'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -892,6 +963,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'zipline'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -904,6 +976,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'mantle'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -916,6 +989,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') posed 'stumble'",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -928,6 +1002,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 0/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -941,6 +1016,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 1/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -954,6 +1030,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 2/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -967,6 +1044,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 3/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -980,6 +1058,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 4/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -993,6 +1072,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 5/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1006,6 +1086,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 6/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1019,6 +1100,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') run cycle frame 7/8 at speed 12",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1032,6 +1114,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 0/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1045,6 +1128,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 1/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1058,6 +1142,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 2/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1071,6 +1156,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 3/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1084,6 +1170,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 4/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1097,6 +1184,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 5/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1110,6 +1198,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 6/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1123,6 +1212,7 @@
       "width": 64,
       "height": 64,
       "made": "RunnerSprite('techwear') sprint cycle frame 7/8 at speed 17",
+      "overridable": false,
       "origin": [
         32,
         52
@@ -1135,231 +1225,264 @@
       "file": "security/drone_0.png",
       "width": 25,
       "height": 12,
-      "made": "bakeDrone(0, false)"
+      "made": "bakeDrone(0, false)",
+      "overridable": true
     },
     {
       "id": "drone_1",
       "file": "security/drone_1.png",
       "width": 25,
       "height": 12,
-      "made": "bakeDrone(1, false)"
+      "made": "bakeDrone(1, false)",
+      "overridable": true
     },
     {
       "id": "drone_alarm_0",
       "file": "security/drone_alarm_0.png",
       "width": 25,
       "height": 12,
-      "made": "bakeDrone(0, true)"
+      "made": "bakeDrone(0, true)",
+      "overridable": true
     },
     {
       "id": "drone_alarm_1",
       "file": "security/drone_alarm_1.png",
       "width": 25,
       "height": 12,
-      "made": "bakeDrone(1, true)"
+      "made": "bakeDrone(1, true)",
+      "overridable": true
     },
     {
       "id": "emitter",
       "file": "security/emitter.png",
       "width": 8,
       "height": 18,
-      "made": "bakeEmitter(14, 1, false)"
+      "made": "bakeEmitter(14, 1, false)",
+      "overridable": false
     },
     {
       "id": "emitter_tripped",
       "file": "security/emitter_tripped.png",
       "width": 8,
       "height": 18,
-      "made": "bakeEmitter(14, 1, true)"
+      "made": "bakeEmitter(14, 1, true)",
+      "overridable": false
     },
     {
       "id": "tank",
       "file": "decor/tank.png",
       "width": 30,
       "height": 52,
-      "made": "bakeDecor('tank', 0.5, pal)"
+      "made": "bakeDecor('tank', 0.5, pal)",
+      "overridable": true
     },
     {
       "id": "antenna",
       "file": "decor/antenna.png",
       "width": 13,
       "height": 47,
-      "made": "bakeDecor('antenna', 0.5, pal)"
+      "made": "bakeDecor('antenna', 0.5, pal)",
+      "overridable": false
     },
     {
       "id": "ac",
       "file": "decor/ac.png",
       "width": 24,
       "height": 15,
-      "made": "bakeDecor('ac', 0.5, pal)"
+      "made": "bakeDecor('ac', 0.5, pal)",
+      "overridable": true
     },
     {
       "id": "dish",
       "file": "decor/dish.png",
       "width": 16,
       "height": 18,
-      "made": "bakeDecor('dish', 0.5, pal)"
+      "made": "bakeDecor('dish', 0.5, pal)",
+      "overridable": true
     },
     {
       "id": "skylight",
       "file": "decor/skylight.png",
       "width": 30,
       "height": 10,
-      "made": "bakeDecor('skylight', 0.5, pal)"
+      "made": "bakeDecor('skylight', 0.5, pal)",
+      "overridable": true
     },
     {
       "id": "vents",
       "file": "decor/vents.png",
       "width": 20,
       "height": 14,
-      "made": "bakeDecor('vents', 0.5, pal)"
+      "made": "bakeDecor('vents', 0.5, pal)",
+      "overridable": true
     },
     {
       "id": "solar",
       "file": "decor/solar.png",
       "width": 40,
       "height": 12,
-      "made": "bakeDecor('solar', 0.5, pal)"
+      "made": "bakeDecor('solar', 0.5, pal)",
+      "overridable": true
     },
     {
       "id": "sign_nova",
       "file": "decor/sign_nova.png",
       "width": 44,
       "height": 48,
-      "made": "bakeDecor('sign', 0.0625, pal)"
+      "made": "bakeDecor('sign', 0.0625, pal)",
+      "overridable": true
     },
     {
       "id": "sign_helix",
       "file": "decor/sign_helix.png",
       "width": 52,
       "height": 48,
-      "made": "bakeDecor('sign', 0.1875, pal)"
+      "made": "bakeDecor('sign', 0.1875, pal)",
+      "overridable": true
     },
     {
       "id": "sign_pulse",
       "file": "decor/sign_pulse.png",
       "width": 52,
       "height": 48,
-      "made": "bakeDecor('sign', 0.3125, pal)"
+      "made": "bakeDecor('sign', 0.3125, pal)",
+      "overridable": true
     },
     {
       "id": "sign_orbit",
       "file": "decor/sign_orbit.png",
       "width": 52,
       "height": 48,
-      "made": "bakeDecor('sign', 0.4375, pal)"
+      "made": "bakeDecor('sign', 0.4375, pal)",
+      "overridable": true
     },
     {
       "id": "sign_kite",
       "file": "decor/sign_kite.png",
       "width": 44,
       "height": 48,
-      "made": "bakeDecor('sign', 0.5625, pal)"
+      "made": "bakeDecor('sign', 0.5625, pal)",
+      "overridable": true
     },
     {
       "id": "sign_volt",
       "file": "decor/sign_volt.png",
       "width": 44,
       "height": 48,
-      "made": "bakeDecor('sign', 0.6875, pal)"
+      "made": "bakeDecor('sign', 0.6875, pal)",
+      "overridable": true
     },
     {
       "id": "sign_zen24",
       "file": "decor/sign_zen24.png",
       "width": 60,
       "height": 48,
-      "made": "bakeDecor('sign', 0.8125, pal)"
+      "made": "bakeDecor('sign', 0.8125, pal)",
+      "overridable": true
     },
     {
       "id": "sign_strata",
       "file": "decor/sign_strata.png",
       "width": 60,
       "height": 48,
-      "made": "bakeDecor('sign', 0.9375, pal)"
+      "made": "bakeDecor('sign', 0.9375, pal)",
+      "overridable": true
     },
     {
       "id": "vent",
       "file": "obstacles/vent.png",
       "width": 22,
       "height": 20,
-      "made": "bakeObstacle('vent', 20, 15, pal, 20261011)"
+      "made": "bakeObstacle('vent', 20, 15, pal, 20261011)",
+      "overridable": false
     },
     {
       "id": "vent_b",
       "file": "obstacles/vent_b.png",
       "width": 17,
       "height": 16,
-      "made": "bakeObstacle('vent', 15, 11, pal, 20261009)"
+      "made": "bakeObstacle('vent', 15, 11, pal, 20261009)",
+      "overridable": false
     },
     {
       "id": "vent_c",
       "file": "obstacles/vent_c.png",
       "width": 24,
       "height": 19,
-      "made": "bakeObstacle('vent', 22, 14, pal, 20261010)"
+      "made": "bakeObstacle('vent', 22, 14, pal, 20261010)",
+      "overridable": false
     },
     {
       "id": "highbox",
       "file": "obstacles/highbox.png",
       "width": 19,
       "height": 33,
-      "made": "bakeObstacle('highbox', 17, 28, pal, 20261010)"
+      "made": "bakeObstacle('highbox', 17, 28, pal, 20261010)",
+      "overridable": false
     },
     {
       "id": "highbox_b",
       "file": "obstacles/highbox_b.png",
       "width": 16,
       "height": 27,
-      "made": "bakeObstacle('highbox', 14, 22, pal, 20261015)"
+      "made": "bakeObstacle('highbox', 14, 22, pal, 20261015)",
+      "overridable": false
     },
     {
       "id": "housing",
       "file": "obstacles/housing.png",
       "width": 79,
       "height": 48,
-      "made": "bakeObstacle('housing', 77, 42, pal, 20261012)"
+      "made": "bakeObstacle('housing', 77, 42, pal, 20261012)",
+      "overridable": false
     },
     {
       "id": "spring",
       "file": "obstacles/spring.png",
       "width": 24,
       "height": 11,
-      "made": "bakeObstacle('spring', 22, 7, pal, 20261017)"
+      "made": "bakeObstacle('spring', 22, 7, pal, 20261017)",
+      "overridable": false
     },
     {
       "id": "pipe",
       "file": "obstacles/pipe.png",
       "width": 70,
       "height": 60,
-      "made": "bakePipe('beam', 31, 6, 14, pal, 20261013)"
+      "made": "bakePipe('beam', 31, 6, 14, pal, 20261013)",
+      "overridable": false
     },
     {
       "id": "pipe_front",
       "file": "obstacles/pipe_front.png",
       "width": 70,
       "height": 60,
-      "made": "bakePipeFront('beam', 31, 6, 14, pal, 20261013)"
+      "made": "bakePipeFront('beam', 31, 6, 14, pal, 20261013)",
+      "overridable": false
     },
     {
       "id": "pipe_b",
       "file": "obstacles/pipe_b.png",
       "width": 70,
       "height": 60,
-      "made": "bakePipe('beam', 22, 6, 14, pal, 20261014)"
+      "made": "bakePipe('beam', 22, 6, 14, pal, 20261014)",
+      "overridable": false
     },
     {
       "id": "pipe_b_front",
       "file": "obstacles/pipe_b_front.png",
       "width": 70,
       "height": 60,
-      "made": "bakePipeFront('beam', 22, 6, 14, pal, 20261014)"
+      "made": "bakePipeFront('beam', 22, 6, 14, pal, 20261014)",
+      "overridable": false
     },
     {
       "id": "fence",
       "file": "obstacles/fence.png",
       "width": 18,
       "height": 49,
-      "made": "bakeFence(36, 9, pal)"
+      "made": "bakeFence(36, 9, pal)",
+      "overridable": false
     },
     {
       "id": "board_0",
@@ -1367,6 +1490,7 @@
       "width": 121,
       "height": 50,
       "made": "bakeBillboard(specFor(20261008, 'facade'), pal, 0)",
+      "overridable": false,
       "spec": {
         "seed": 20261008,
         "place": "facade"
@@ -1378,6 +1502,7 @@
       "width": 121,
       "height": 50,
       "made": "bakeBillboard(specFor(20261008, 'facade'), pal, 1)",
+      "overridable": false,
       "spec": {
         "seed": 20261008,
         "place": "facade"
@@ -1389,6 +1514,7 @@
       "width": 13,
       "height": 55,
       "made": "bakeBillboard(specFor(20261011, 'near'), pal, 0)",
+      "overridable": false,
       "spec": {
         "seed": 20261011,
         "place": "near"
@@ -1400,6 +1526,7 @@
       "width": 13,
       "height": 55,
       "made": "bakeBillboard(specFor(20261011, 'near'), pal, 1)",
+      "overridable": false,
       "spec": {
         "seed": 20261011,
         "place": "near"
@@ -1411,6 +1538,7 @@
       "width": 24,
       "height": 36,
       "made": "bakeBillboard(specFor(20261017, 'near'), pal, 0)",
+      "overridable": false,
       "spec": {
         "seed": 20261017,
         "place": "near"
@@ -1422,6 +1550,7 @@
       "width": 24,
       "height": 36,
       "made": "bakeBillboard(specFor(20261017, 'near'), pal, 1)",
+      "overridable": false,
       "spec": {
         "seed": 20261017,
         "place": "near"
@@ -1433,6 +1562,7 @@
       "width": 63,
       "height": 16,
       "made": "bakeBillboard(specFor(20261019, 'near'), pal, 0)",
+      "overridable": false,
       "spec": {
         "seed": 20261019,
         "place": "near"
@@ -1444,6 +1574,7 @@
       "width": 44,
       "height": 30,
       "made": "bakeBillboard(specFor(20261027, 'near'), pal, 0)",
+      "overridable": false,
       "spec": {
         "seed": 20261027,
         "place": "near"
@@ -1455,6 +1586,7 @@
       "width": 44,
       "height": 30,
       "made": "bakeBillboard(specFor(20261027, 'near'), pal, 1)",
+      "overridable": false,
       "spec": {
         "seed": 20261027,
         "place": "near"
@@ -1466,6 +1598,7 @@
       "width": 16,
       "height": 27,
       "made": "drawArt('can') with artColors(pal.neon[0])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.can"
     },
     {
@@ -1474,6 +1607,7 @@
       "width": 20,
       "height": 14,
       "made": "drawArt('bowl') with artColors(pal.neon[1])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.bowl"
     },
     {
@@ -1482,6 +1616,7 @@
       "width": 22,
       "height": 30,
       "made": "drawArt('face') with artColors(pal.neon[2])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.face"
     },
     {
@@ -1490,6 +1625,7 @@
       "width": 16,
       "height": 16,
       "made": "drawArt('cat') with artColors(pal.neon[3])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.cat"
     },
     {
@@ -1498,6 +1634,7 @@
       "width": 14,
       "height": 13,
       "made": "drawArt('skull') with artColors(pal.neon[0])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.skull"
     },
     {
@@ -1506,6 +1643,7 @@
       "width": 16,
       "height": 11,
       "made": "drawArt('eye') with artColors(pal.neon[1])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.eye"
     },
     {
@@ -1514,6 +1652,7 @@
       "width": 20,
       "height": 9,
       "made": "drawArt('koi') with artColors(pal.neon[2])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.koi"
     },
     {
@@ -1522,6 +1661,7 @@
       "width": 18,
       "height": 9,
       "made": "drawArt('shoe') with artColors(pal.neon[3])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.shoe"
     },
     {
@@ -1530,6 +1670,7 @@
       "width": 12,
       "height": 11,
       "made": "drawArt('pill') with artColors(pal.neon[0])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.pill"
     },
     {
@@ -1538,6 +1679,7 @@
       "width": 10,
       "height": 18,
       "made": "drawArt('bottle') with artColors(pal.neon[1])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.bottle"
     },
     {
@@ -1546,6 +1688,7 @@
       "width": 14,
       "height": 15,
       "made": "drawArt('badge') with artColors(pal.neon[2])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.badge"
     },
     {
@@ -1554,6 +1697,7 @@
       "width": 19,
       "height": 10,
       "made": "drawArt('planet') with artColors(pal.neon[3])",
+      "overridable": true,
       "source": "src/pixel/art.js ART.planet"
     },
     {
@@ -1561,105 +1705,120 @@
       "file": "sky/bird_0.png",
       "width": 5,
       "height": 3,
-      "made": "bakeBird(0)"
+      "made": "bakeBird(0)",
+      "overridable": true
     },
     {
       "id": "bird_1",
       "file": "sky/bird_1.png",
       "width": 5,
       "height": 3,
-      "made": "bakeBird(1)"
+      "made": "bakeBird(1)",
+      "overridable": true
     },
     {
       "id": "bird_2",
       "file": "sky/bird_2.png",
       "width": 5,
       "height": 3,
-      "made": "bakeBird(2)"
+      "made": "bakeBird(2)",
+      "overridable": true
     },
     {
       "id": "car_right",
       "file": "sky/car_right.png",
       "width": 9,
       "height": 4,
-      "made": "bakeCar(1, pal, 3)"
+      "made": "bakeCar(1, pal, 3)",
+      "overridable": true
     },
     {
       "id": "car_left",
       "file": "sky/car_left.png",
       "width": 9,
       "height": 4,
-      "made": "bakeCar(-1, pal, 4)"
+      "made": "bakeCar(-1, pal, 4)",
+      "overridable": true
     },
     {
       "id": "cloud_a",
       "file": "sky/cloud_a.png",
       "width": 40,
       "height": 12,
-      "made": "bakeCloud(40, 12, pal, 20261008)"
+      "made": "bakeCloud(40, 12, pal, 20261008)",
+      "overridable": false
     },
     {
       "id": "cloud_b",
       "file": "sky/cloud_b.png",
       "width": 56,
       "height": 16,
-      "made": "bakeCloud(56, 16, pal, 20261009)"
+      "made": "bakeCloud(56, 16, pal, 20261009)",
+      "overridable": false
     },
     {
       "id": "cloud_c",
       "file": "sky/cloud_c.png",
       "width": 72,
       "height": 20,
-      "made": "bakeCloud(72, 20, pal, 20261010)"
+      "made": "bakeCloud(72, 20, pal, 20261010)",
+      "overridable": false
     },
     {
       "id": "tower_a",
       "file": "city/tower_a.png",
       "width": 28,
       "height": 290,
-      "made": "bakeTower(28, 90, 2, pal.near, pal.midWin, pal, 20261008)"
+      "made": "bakeTower(28, 90, 2, pal.near, pal.midWin, pal, 20261008)",
+      "overridable": false
     },
     {
       "id": "tower_b",
       "file": "city/tower_b.png",
       "width": 36,
       "height": 310,
-      "made": "bakeTower(36, 110, 2, pal.near, pal.midWin, pal, 20261021)"
+      "made": "bakeTower(36, 110, 2, pal.near, pal.midWin, pal, 20261021)",
+      "overridable": false
     },
     {
       "id": "tower_c",
       "file": "city/tower_c.png",
       "width": 44,
       "height": 330,
-      "made": "bakeTower(44, 130, 2, pal.near, pal.midWin, pal, 20261034)"
+      "made": "bakeTower(44, 130, 2, pal.near, pal.midWin, pal, 20261034)",
+      "overridable": false
     },
     {
       "id": "facade_brick",
       "file": "city/facade_brick.png",
       "width": 120,
       "height": 374,
-      "made": "bakeFacade({ w: 120, roofH: 10, style: 0, seed: 20261008, pal, wall: 0 })"
+      "made": "bakeFacade({ w: 120, roofH: 10, style: 0, seed: 20261008, pal, wall: 0 })",
+      "overridable": false
     },
     {
       "id": "facade_glass",
       "file": "city/facade_glass.png",
       "width": 120,
       "height": 374,
-      "made": "bakeFacade({ w: 120, roofH: 10, style: 1, seed: 20261008, pal, wall: 1 })"
+      "made": "bakeFacade({ w: 120, roofH: 10, style: 1, seed: 20261008, pal, wall: 1 })",
+      "overridable": false
     },
     {
       "id": "facade_concrete",
       "file": "city/facade_concrete.png",
       "width": 120,
       "height": 374,
-      "made": "bakeFacade({ w: 120, roofH: 10, style: 2, seed: 20261008, pal, wall: 2 })"
+      "made": "bakeFacade({ w: 120, roofH: 10, style: 2, seed: 20261008, pal, wall: 2 })",
+      "overridable": false
     },
     {
       "id": "facade_metal",
       "file": "city/facade_metal.png",
       "width": 120,
       "height": 374,
-      "made": "bakeFacade({ w: 120, roofH: 10, style: 3, seed: 20261008, pal, wall: 3 })"
+      "made": "bakeFacade({ w: 120, roofH: 10, style: 3, seed: 20261008, pal, wall: 3 })",
+      "overridable": false
     }
   ]
 }
