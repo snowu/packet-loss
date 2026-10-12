@@ -20,6 +20,10 @@ import { ACCENT } from '../pixel/palette.js'
 import { RoofWater } from '../pixel/water.js'
 import { bakeLightHalo, drawLightHalo, drawSteam, ParkourFX } from '../pixel/effects.js'
 import { drawRoofSurface, drawContactShadow, drawRunnerContact, equipmentLight } from '../pixel/roof.js'
+import { loadArtOverrides } from '../pixel/overrides.js'
+
+// the lab shows the art as the game will: artist PNGs from public/art included
+await loadArtOverrides()
 
 const $ = (id) => document.getElementById(id)
 const runnerName = (id) => RUNNER_STYLES[id].name

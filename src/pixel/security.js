@@ -5,6 +5,7 @@
 // both draw through these functions.
 import { PixelBuffer, toCanvas, pack, mix, css, dither, hash } from './pixels.js'
 import { outlined } from './sprites.js'
+import { withOverride } from './overrides.js'
 
 export const SECURITY = [255, 47, 160]
 export const ALARM = [255, 170, 40]
@@ -51,7 +52,7 @@ export function bakeDrone(frame, alarm) {
   // scanner under the belly
   b.rect(10, 8, 3, 1, dark)
   b.set(11, 9, pack(eye))
-  return outlined(b, ink)
+  return withOverride(`drone${alarm ? '_alarm' : ''}_${frame & 1}`, outlined(b, ink))
 }
 
 const droneCache = new Map()

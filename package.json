@@ -10,7 +10,9 @@
     "test": "vitest run",
     "bench": "node bench/bench.js",
     "bench:check": "node bench/bench.js --check",
-    "art:export": "node scripts/export-art.mjs"
+    "art:export": "node scripts/export-art.mjs",
+    "art:use": "node scripts/use-art.mjs",
+    "art:check": "node scripts/use-art.mjs --check"
   },
   "keywords": [],
   "author": "",

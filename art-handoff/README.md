@@ -16,4 +16,14 @@ Numbered files (`bird_0`, `bird_1`…) are animation frames; spritewright plays 
 
 `manifest.json` lists every file with the function and arguments that drew it. Run `npm run art:export` again for a fresh export from the code; it replaces this folder.
 
-Edited PNGs do not flow back into the game yet: the game still draws from code. Wiring a PNG override (load `public/art/<id>.png` when it exists, fall back to the code) is the next step.
+## Putting redrawn art in the game
+
+Files marked `"overridable": true` in the manifest go straight into the game: the drones, birds, cars, rooftop decor and signs, and the ad mascots. Edit them here, keeping the canvas size, then run
+
+    npm run art:use -- --changed
+
+It copies every PNG that differs from the built-in art into `public/art/` and lists it in `public/art/manifest.json`. The game and the art lab load those before drawing anything, and they're cached for offline play. `npm run art:use -- --remove <id>` goes back to the built-in art for one sprite, and `npm run art:check` verifies the overrides.
+
+A redrawn PNG keeps its own colours. The built-in art is recoloured per district (ads take the billboard's hue), so a redrawn sprite looks the same in every district.
+
+Not redrawable yet: the runner (posed live from a skeleton, so these frames are reference), obstacles, pipes, billboards, clouds, towers and facades, whose sizes change with the level. The antenna and laser emitter heights vary too.

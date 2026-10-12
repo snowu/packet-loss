@@ -6,7 +6,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolve, dirname } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { paletteAt, pinPalette, PALETTE_NAMES } from '../src/pixel/palette.js'
-import { bakeDecor, bakeBird, bakeCar, bakeCloud, BRANDS, PPU } from '../src/pixel/sprites.js'
+import { bakeDecor, bakeBird, bakeCar, bakeCloud, BRANDS, PPU, signArtId } from '../src/pixel/sprites.js'
 import { bakeDrone, bakeEmitter } from '../src/pixel/security.js'
 import { bakeObstacle, bakePipe, bakePipeFront, bakeFence } from '../src/pixel/obstacles.js'
 import { bakeBillboard, specFor } from '../src/pixel/billboard.js'
@@ -32,8 +32,13 @@ function png(buf) {
 const copy = (b) => { const c = new PixelBuffer(b.w, b.h); c.data.set(b.data); return c }
 
 const manifest = []
+// art the game can take back as a PNG (src/pixel/overrides.js): fixed-size sprites drawn through withOverride/peekOverride
+const OVERRIDABLE = (folder, id) => folder === 'security' && id.startsWith('drone') || folder === 'decor' && id !== 'antenna' || folder === 'ads' || /^(bird_\d|car_(left|right))$/.test(id)
+const seenIds = new Set()
 async function save(folder, id, buf, made, extra = {}) {
   if (!buf || !buf.w || !buf.h) return
+  if (seenIds.has(id)) throw new Error('duplicate art ID ' + id); seenIds.add(id)
+  extra = { overridable: OVERRIDABLE(folder, id), ...extra }
   const file = `${folder}/${id}.png`
   await mkdir(dirname(resolve(out, file)), { recursive: true })
   await writeFile(resolve(out, file), png(buf))
@@ -80,7 +85,7 @@ for (const tripped of [false, true]) await save('security', `emitter${tripped ? 
 for (const type of ['tank', 'antenna', 'ac', 'dish', 'skylight', 'vents', 'solar']) await save('decor', type, bakeDecor(type, 0.5, pal), `bakeDecor('${type}', 0.5, pal)`)
 for (let i = 0; i < BRANDS.length; i++) {
   const v = (i + 0.5) / BRANDS.length
-  await save('decor', `sign_${BRANDS[i].toLowerCase().replace(/\W+/g, '')}`, bakeDecor('sign', v, pal), `bakeDecor('sign', ${v.toFixed(4)}, pal)`)
+  await save('decor', signArtId(BRANDS[i]), bakeDecor('sign', v, pal), `bakeDecor('sign', ${v.toFixed(4)}, pal)`)
 }
 
 // ── obstacles (the style lab's obstacle sheet) ──
@@ -141,6 +146,16 @@ Numbered files (\`bird_0\`, \`bird_1\`…) are animation frames; spritewright pl
 
 \`manifest.json\` lists every file with the function and arguments that drew it. Run \`npm run art:export\` again for a fresh export from the code; it replaces this folder.
 
-Edited PNGs do not flow back into the game yet: the game still draws from code. Wiring a PNG override (load \`public/art/<id>.png\` when it exists, fall back to the code) is the next step.
+## Putting redrawn art in the game
+
+Files marked \`"overridable": true\` in the manifest go straight into the game: the drones, birds, cars, rooftop decor and signs, and the ad mascots. Edit them here, keeping the canvas size, then run
+
+    npm run art:use -- --changed
+
+It copies every PNG that differs from the built-in art into \`public/art/\` and lists it in \`public/art/manifest.json\`. The game and the art lab load those before drawing anything, and they're cached for offline play. \`npm run art:use -- --remove <id>\` goes back to the built-in art for one sprite, and \`npm run art:check\` verifies the overrides.
+
+A redrawn PNG keeps its own colours. The built-in art is recoloured per district (ads take the billboard's hue), so a redrawn sprite looks the same in every district.
+
+Not redrawable yet: the runner (posed live from a skeleton, so these frames are reference), obstacles, pipes, billboards, clouds, towers and facades, whose sizes change with the level. The antenna and laser emitter heights vary too.
 `)
 console.log(`Exported ${manifest.length} PNGs to ${out}`)
