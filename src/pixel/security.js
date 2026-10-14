@@ -5,7 +5,7 @@
 // both draw through these functions.
 import { PixelBuffer, toCanvas, pack, mix, css, dither, hash } from './pixels.js'
 import { outlined } from './sprites.js'
-import { withOverride } from './overrides.js'
+import { defineArt, fromArt } from './artPng.js'
 
 export const SECURITY = [255, 47, 160]
 export const ALARM = [255, 170, 40]
@@ -21,6 +21,10 @@ export const DRONE_W = 25
 export const DRONE_BOTTOM = 9   // rows from the sprite top to the hitbox bottom
 
 export function bakeDrone(frame, alarm) {
+  return fromArt(`drone${alarm ? '_alarm' : ''}_${frame & 1}`, droneArt(frame, alarm))
+}
+
+function droneArt(frame, alarm) {
   const eye = alarm ? ALARM : SECURITY
   const b = new PixelBuffer(23, 10)
   const hl = pack(mix(HULL, [170, 168, 200], 0.45)), base = pack(mix(HULL, [120, 118, 150], 0.22))
@@ -52,8 +56,9 @@ export function bakeDrone(frame, alarm) {
   // scanner under the belly
   b.rect(10, 8, 3, 1, dark)
   b.set(11, 9, pack(eye))
-  return withOverride(`drone${alarm ? '_alarm' : ''}_${frame & 1}`, outlined(b, ink))
+  return outlined(b, ink)
 }
+for (const alarm of [false, true]) for (const f of [0, 1]) defineArt(`drone${alarm ? '_alarm' : ''}_${f}`, 'security', () => droneArt(f, alarm))
 
 const droneCache = new Map()
 function droneCanvas(frame, alarm) {
