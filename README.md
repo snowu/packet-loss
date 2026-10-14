@@ -84,6 +84,17 @@ Anything you can use is painted runner-vision red. Puddles and broken neon refle
 - `src/pixel/` is the renderer: palettes, pixel buffers and dithering, sprite bakers, the skeletal runner sprite, and the view.
 - `src/ui/`, `src/input.js` and `src/audio.js` are the HUD, the input layer (keyboard, touch and gamepad), and fully synthesized audio and music.
 
+## Redrawing the art
+
+The drones, birds, sky cars, rooftop props and brand signs, and the ad mascots are drawn from PNGs in `public/art/<folder>/<id>.png`. That folder is what the game ships, so painting over a PNG there (same name, same canvas size) and merging it is all it takes: there is no second copy and no command to run. Open the repository in [spritewright](https://snowu.github.io/spritewright/?repo=snowu/packet-loss) or use any pixel editor.
+
+- The PNGs start out drawn by the code, in the **Neon Dusk** palette. Every colour of that original follows the district (and, for ads, the billboard's hue), so keep those exact colours where you want the sprite to change with the city. Colours you add stay as painted in every district.
+- A PNG at the wrong size, or missing, is ignored with a console warning and the code art is drawn instead, so layout and hitboxes never move. `npm test` fails on either.
+- Numbered files (`bird_0`, `bird_1`…) are animation frames.
+- Not drawn from PNGs yet: the runner (posed live from a skeleton), obstacles, pipes, billboards, clouds, towers, facades and the antenna, whose sizes change with the level.
+
+A new sprite is registered with `defineArt` (`src/pixel/artPng.js`); `node scripts/art-placeholders.mjs` then writes its first PNG from the code art. Existing PNGs are never rewritten.
+
 ## Development
 
 The game plays offline. A service worker caches the whole game and its fonts the first time you open it online; after that, the page or the installed home-screen app starts without a network, with records and settings intact. Update checks simply wait until you're back online.

@@ -1,0 +1,5 @@
+{
+  "dirs": ["public/art"],
+  "background": "#1a0b2e",
+  "repo": { "slug": "snowu/packet-loss", "base": "master" }
+}

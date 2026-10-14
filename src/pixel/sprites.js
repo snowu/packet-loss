@@ -1,8 +1,8 @@
 // Procedural pixel-art sprites: rooftop obstacles and props, signage, sky
 // traffic, clouds. Facades and skyline towers live in city.js. Everything is drawn into PixelBuffers with the current palette.
 import { PixelBuffer, pack, mix, hash, dither } from './pixels.js'
-import { ACCENT } from './palette.js'
-import { withOverride } from './overrides.js'
+import { ACCENT, BASE_PALETTE } from './palette.js'
+import { defineArt, fromArt } from './artPng.js'
 
 export const PPU = 14              // pixels per meter
 export const FACADE_DEPTH = 26     // meters of facade below a roof line
@@ -57,6 +57,10 @@ export function outlined(src, color = INK) {
 }
 
 export function bakeCar(dir, pal, seed) {
+  return fromArt(dir > 0 ? 'car_right' : 'car_left', drawCar(dir, pal, seed))
+}
+
+function drawCar(dir, pal, seed) {
   const b = new PixelBuffer(9, 4)
   const body = pack(mix([40, 40, 56], pal.shadow, 0.3))
   const under = pack(pal.neon[Math.floor(hash(seed, 2) * pal.neon.length)])
@@ -65,8 +69,10 @@ export function bakeCar(dir, pal, seed) {
   b.rect(2, 3, 5, 1, under)
   b.set(dir > 0 ? 8 : 0, 1, pack([255, 250, 220]))
   b.set(dir > 0 ? 0 : 8, 1, pack([255, 40, 40]))
-  return withOverride(dir > 0 ? 'car_right' : 'car_left', b)
+  return b
 }
+defineArt('car_right', 'sky', () => drawCar(1, BASE_PALETTE, 3))
+defineArt('car_left', 'sky', () => drawCar(-1, BASE_PALETTE, 4))
 
 // Push decor colors toward the backdrop so foreground obstacles read first.
 export function recede(b, color, t) {
@@ -82,15 +88,17 @@ export function recede(b, color, t) {
 // ── decor standing on roofs ─────────────────────────────────────────────
 
 // classic: the sign as it was before the clarity pass (panel at torso height)
-// Art IDs for decor an artist can redraw (fixed size whatever the variant). The
-// antenna's height varies, so it stays code-only.
-const DECOR_ART = new Set(['tank', 'ac', 'dish', 'skylight', 'vents', 'solar'])
+// Decor drawn from PNGs (fixed size whatever the variant). The antenna's
+// height varies, so it stays code-only.
+const DECOR_ART = ['tank', 'ac', 'dish', 'skylight', 'vents', 'solar']
 export const signArtId = (brand) => 'sign_' + brand.toLowerCase().replace(/\W+/g, '')
+for (const type of DECOR_ART) defineArt(type, 'decor', () => drawDecor(type, 0.5, BASE_PALETTE))
+BRANDS.forEach((brand, i) => defineArt(signArtId(brand), 'decor', () => drawDecor('sign', (i + 0.5) / BRANDS.length, BASE_PALETTE)))
 
 export function bakeDecor(type, variant, pal, opts = {}) {
   const b = drawDecor(type, variant, pal, opts)
-  if (DECOR_ART.has(type)) return withOverride(type, b)
-  if (type === 'sign' && !opts.classic) return withOverride(signArtId(BRANDS[Math.floor(variant * BRANDS.length)]), b)
+  if (DECOR_ART.includes(type)) return fromArt(type, b)
+  if (type === 'sign' && !opts.classic) return fromArt(signArtId(BRANDS[Math.floor(variant * BRANDS.length)]), b)
   return b
 }
 
@@ -185,13 +193,18 @@ function drawDecor(type, variant, pal, { classic = false } = {}) {
 }
 
 export function bakeBird(frame) {
+  return fromArt(`bird_${frame}`, drawBird(frame))
+}
+
+function drawBird(frame) {
   const b = new PixelBuffer(5, 3)
   const c = pack([25, 20, 30])
   if (frame === 0) { b.rect(1, 1, 3, 1, c); b.set(4, 0, c) }
   else if (frame === 1) { b.set(0, 0, c); b.set(1, 1, c); b.set(2, 1, c); b.set(3, 0, c); b.set(4, 0, c) }
   else { b.set(0, 2, c); b.set(1, 1, c); b.set(2, 1, c); b.set(3, 2, c) }
-  return withOverride(`bird_${frame}`, b)
+  return b
 }
+for (const f of [0, 1, 2]) defineArt(`bird_${f}`, 'sky', () => drawBird(f))
 
 export function bakeCloud(w, h, pal, seed) {
   const b = new PixelBuffer(w, h)

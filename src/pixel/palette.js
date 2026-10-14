@@ -112,6 +112,10 @@ function lerpValue(a, b, t) {
 
 export const PALETTE_NAMES = KEYS.map((k) => k.name)
 
+// The first district as paletteAt(0) gives it unpinned: the palette the
+// sprite PNGs in public/art start out in (see artPng.js).
+export const BASE_PALETTE = { version: 0, ...KEYS[0], accent: ACCENT }
+
 // null drifts through every district; an index pins one for the whole run.
 let pinned = null
 export function pinPalette(i) { pinned = i === null ? null : i % KEYS.length }

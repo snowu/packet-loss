@@ -1,7 +1,8 @@
 // Hand-drawn pixel art and lettering for advertising: product and mascot
 // sprites, a 5x7 display font, and procedurally built faux-kanji.
-import { pack, mix, hash } from './pixels.js'
-import { peekOverride } from './overrides.js'
+import { PixelBuffer, pack, mix, hash } from './pixels.js'
+import { defineArt, fromArt } from './artPng.js'
+import { BASE_PALETTE } from './palette.js'
 
 // ── sprites ──────────────────────────────────────────────────────────────
 // Keys: k outline · a hue · b hue shade · c hue light · w white · W white shade
@@ -232,21 +233,26 @@ export function artColors(hue, pal, hair) {
   }
 }
 
-export function drawArt(b, name, x, y, colors, scale = 1, flip = false) {
-  const rows = ART[name]
-  const w = rows[0].length
-  // an artist's PNG keeps its own colours instead of the billboard's hue
-  const o = peekOverride(name, w, rows.length)
-  if (o) {
-    for (let ry = 0; ry < o.h; ry++) for (let rx = 0; rx < w; rx++) { const c = o.data[ry * w + (flip ? w - 1 - rx : rx)]; if (c >>> 24) b.rect(x + rx * scale, y + ry * scale, scale, scale, c) }
-    return
-  }
+// The rows of ART[name] in `colors`, at native size.
+function paintArt(name, colors) {
+  const rows = ART[name], b = new PixelBuffer(rows[0].length, rows.length)
   rows.forEach((row, ry) => {
-    for (let rx = 0; rx < w; rx++) {
-      const c = colors[row[flip ? w - 1 - rx : rx]]
-      if (c) b.rect(x + rx * scale, y + ry * scale, scale, scale, c)
-    }
+    for (let rx = 0; rx < b.w; rx++) { const c = colors[row[rx]]; if (c) b.set(rx, ry, c) }
   })
+  return b
+}
+// the PNGs start out in the first district, each in its own neon
+ART_NAMES.forEach((name, i) => {
+  const n = BASE_PALETTE.neon
+  defineArt(name, 'ads', () => paintArt(name, artColors(n[i % n.length], BASE_PALETTE, n[(i + 1) % n.length])))
+})
+
+export function drawArt(b, name, x, y, colors, scale = 1, flip = false) {
+  const o = fromArt(name, paintArt(name, colors))
+  for (let ry = 0; ry < o.h; ry++) for (let rx = 0; rx < o.w; rx++) {
+    const c = o.data[ry * o.w + (flip ? o.w - 1 - rx : rx)]
+    if (c >>> 24) b.rect(x + rx * scale, y + ry * scale, scale, scale, c)
+  }
 }
 
 // ── lettering ────────────────────────────────────────────────────────────

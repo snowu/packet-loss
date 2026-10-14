@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 const version = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
 const builtAt = new Date().toISOString()
@@ -15,11 +15,10 @@ const release = { id, version, builtAt }
 // The offline service worker: src/sw.js with the release and the files to
 // precache filled in. The art lab only runs locally, so it stays out.
 const PUBLIC = ['./', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png']
-// artist PNGs that replace built-in sprites (see src/pixel/overrides.js), so they work offline too
+// the sprite PNGs (see src/pixel/artPng.js), so they work offline too
 export function artFiles(dir = new URL('./public/art/', import.meta.url)) {
   try {
-    const ids = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'))
-    return ['art/manifest.json', ...ids.filter((id) => /^[\w-]+$/.test(id)).map((id) => `art/${id}.png`)]
+    return readdirSync(dir, { recursive: true }).map((f) => String(f).replaceAll('\\', '/')).filter((f) => f.endsWith('.png')).sort().map((f) => `art/${f}`)
   } catch { return [] }
 }
 export function serviceWorker(releaseId, files, art = artFiles()) {
