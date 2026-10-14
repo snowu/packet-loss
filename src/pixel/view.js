@@ -3,10 +3,10 @@ import { toCanvas, pack, mix, css, dither, hash, PixelBuffer } from './pixels.js
 import { paletteAt, districtName, ACCENT } from './palette.js'
 import { RunnerSprite, ORIGIN_X, ORIGIN_Y } from './runner.js'
 import { RoofWater } from './water.js'
-import { bakeLightHalo, drawLightHalo, drawSteam, ParkourFX } from './effects.js'
+import { drawLightHalo, drawSteam, ParkourFX } from './effects.js'
 import { drawRoofSurface, drawContactShadow, drawRunnerContact, equipmentLight } from './roof.js'
 import { PPU, bakeDecor, bakeBird, bakeCloud, bakeCar, recede, outlined } from './sprites.js'
-import { CITY, bakeTower } from './city.js'
+import { CITY } from './city.js'
 import { Baker } from './baker.js'
 import { runJob } from './bakes.js'
 import { bakeBillboard, specFor, inks, billboardLight, drawTicker } from './billboard.js'
@@ -15,6 +15,7 @@ import { bakeObstacle, lipOf, pipeFrame, bakeFence, drawFenceLive } from './obst
 import { drawDrone, drawWreck, drawLaser, drawLaserSpill, drawShard, SHARD, SECURITY as LASER } from './security.js'
 import { PHYS, HEIST } from '../sim/config.js'
 import { createRng } from '../sim/rng.js'
+import { FocusFilter } from './focus.js'
 
 // Internal resolution: 270px tall in landscape; portrait screens get a taller
 // canvas instead of a letterboxed strip. Module-level so the bakers share it.
@@ -76,6 +77,7 @@ export class PixelView {
     this.lightningClock = 8
     this.weather = { rain: 0, wet: 0, target: 0, clock: 0, ready: false }
     this.layers = LAYERS.map((L) => ({ ...L, items: [], cursor: null, rng: createRng(Math.floor(L.f * 1e4)) }))
+    this.lightKeys = new Map()
     this.clouds = { items: [], cursor: null, rng: createRng(77) }
     this.cars = []
     this.carRng = createRng(404)
@@ -142,6 +144,7 @@ export class PixelView {
     const hit = this.cache.get(key)
     if (hit?.version === version) return hit.canvas
     if (!this.baker.ready || this.budget === Infinity) return this.sprite(key, version, () => runJob(job()))
+    if (this.baker.pending.get(key) === version) return hit?.canvas ?? null
     this.baker.want(key, version, job())
     return hit?.canvas ?? null
   }
@@ -188,8 +191,11 @@ export class PixelView {
   bind(level) {
     this.water = new RoofWater()
     this.effects = new ParkourFX()
-    for (const key of [...this.cache.keys()]) if (key.startsWith('c') || key.startsWith('L') || key.startsWith('bb')) this.cache.delete(key)
-    this.baker.drop((key) => key.startsWith('c'))
+    // Course keys are c<id>:..., unlike clouds (cl...) and traffic (car...).
+    // Keep those city sprites when restarting instead of rebaking them.
+    const courseKey = key => /^c\d+:/.test(key)
+    for (const key of [...this.cache.keys()]) if (courseKey(key) || key.startsWith('L') || key.startsWith('bb')) this.cache.delete(key)
+    this.baker.drop((key) => courseKey(key) || key.startsWith('L') || key.startsWith('bb'))
     this.views.clear()
     this.birds = []
     this.particles = []
@@ -380,6 +386,7 @@ export class PixelView {
     if (on === this.classic) return
     this.classic = on
     this.cache.clear()
+    this.baker.drop(() => true)
     this.rebakeAll = true
   }
 
@@ -456,7 +463,7 @@ export class PixelView {
     this.blendCanvas ??= document.createElement('canvas')
     this.blendCanvas.width = this.W
     this.blendCanvas.height = H
-    this.blendCanvas.getContext('2d').drawImage(this.canvas, 0, 0)
+    this.blendCanvas.getContext('2d').drawImage(this.focusFilter?.source ? this.focusFilter.canvas : this.canvas, 0, 0)
     this.blend = 1
     this.rebakeAll = true
   }
@@ -467,6 +474,7 @@ export class PixelView {
     const pal = paletteAt(s.paletteD ?? s.distance)
     this.pal = pal
     this.budget = this.rebakeAll ? Infinity : 2
+    this.budget -= this.baker.flush(1)
     this.rebakeAll = false
     const { ctx } = this
     const W = this.W
@@ -512,12 +520,22 @@ export class PixelView {
       ctx.drawImage(this.now('alarm', `${W}x${H}`, () => ['alarm', [W, H]]), 0, 0)
       ctx.globalAlpha = 1
     }
-    if (s.focusVis > 0.02) this.postFocus(s.focusVis)
+    // Present focus directly from the GPU, avoiding a GPU -> 2D round trip.
+    // Interference/crossfades retain the CPU path to preserve their ordering.
+    const flash = Math.max(s.flash, this.lightning)
+    let gpuFocus = false
+    if (s.focusVis > 0.02 && this.glitchAmt <= 0.01 && this.blend <= 0) {
+      this.focusFilter ??= new FocusFilter()
+      gpuFocus = this.focusFilter.draw(ctx, s.focusVis, { present: true, flash: Math.min(0.9, flash), fade: s.fade })
+    }
+    if (!gpuFocus) {
+      this.focusFilter?.hide()
+      if (s.focusVis > 0.02) this.postFocus(s.focusVis)
+    }
     if (this.glitchAmt > 0.01) this.postGlitch(this.glitchAmt)
     this.glitchAmt = Math.max(0, this.glitchAmt - s.raw * 2.2)
-    const flash = Math.max(s.flash, this.lightning)
-    if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.9, flash)})`; ctx.fillRect(0, 0, W, H) }
-    if (s.fade > 0) { ctx.fillStyle = `rgba(8,6,16,${s.fade})`; ctx.fillRect(0, 0, W, H) }
+    if (!gpuFocus && flash > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.9, flash)})`; ctx.fillRect(0, 0, W, H) }
+    if (!gpuFocus && s.fade > 0) { ctx.fillStyle = `rgba(8,6,16,${s.fade})`; ctx.fillRect(0, 0, W, H) }
     if (this.blend > 0) {
       ctx.globalAlpha = Math.min(1, this.blend)
       ctx.drawImage(this.blendCanvas, 0, 0)
@@ -603,15 +621,18 @@ export class PixelView {
       // towers that scroll off take their sprites with them, or a long run
       // keeps a canvas for every building it ever passed
       while (L.items.length && L.items[0].u + L.items[0].w - off < -20) this.forgetTower(li, L.items.shift().seed)
-      while (L.cursor - off < this.W + 40) {
+      while (L.cursor - off < this.W + 80) {
         const w = L.rng.int(...L.w)
         L.cursor += L.rng.int(...L.gap)
         L.items.push({ u: L.cursor, w, h: L.rng.int(...L.h), seed: L.rng.int(1, 1e6) })
         L.cursor += w
       }
       for (const it of L.items) {
-        if (it.u - off > this.W) break
-        const cv = this.sprite(`L${li}:${it.seed}`, pal.version, () => bakeTower(it.w, it.h, li, pal[L.color], pal[L.win], pal, it.seed))
+        const key = `L${li}:${it.seed}`
+        const job = () => ['tower', [it.w, it.h, li, pal[L.color], pal[L.win], pal, it.seed]]
+        const cv = it.u - off <= this.W ? this.now(key, pal.version, job) : this.later(key, pal.version, job)
+        it.canvas = cv
+        if (it.u - off > this.W) continue
         const x = Math.round(it.u - off)
         this.ctx.drawImage(cv, x, base - it.h)
         if (li > 0 && hash(it.seed, 77) < CITY.holos) this.drawBillboard(it, x, base, li, pal)
@@ -634,6 +655,7 @@ export class PixelView {
 
   forgetTower(li, seed) {
     this.cache.delete(`L${li}:${seed}`)
+    this.baker.drop((key) => key === `L${li}:${seed}`)
     for (const f of ['halo', 0, 1, 2]) this.cache.delete(`bb${seed}:${f}`)
   }
 
@@ -660,7 +682,18 @@ export class PixelView {
     const t = this.cam.time
     const color = billboardLight(s, pal, t)
     const panelH = s.ph ?? Math.min(s.h, 24)
-    const halo = this.sprite(`${key}:halo`, `${pal.version}:${color}`, () => bakeLightHalo(s.w + 64, panelH + 52, color))
+    // The halo depends on size and ink alone, so signs with the same ink
+    // share it. Palette transitions no longer rebuild unchanged lights.
+    const haloKey = `light:${s.w}:${panelH}:${color}`
+    this.lightKeys.delete(haloKey)
+    this.lightKeys.set(haloKey, true)
+    if (this.lightKeys.size > 16) {
+      const old = this.lightKeys.keys().next().value
+      this.lightKeys.delete(old)
+      this.cache.delete(old)
+      this.baker.drop(key => key === old)
+    }
+    const halo = this.now(haloKey, 0, () => ['lightHalo', [s.w + 64, panelH + 52, color]])
     const strength = pal.night * (s.place === 'far' || s.place === 'near' ? 0.48 : 0.95) * (0.65 + this.weather.rain * 0.35)
     if (s.place === 'facade' || s.place === 'roof') this.lamps.push({ x: x + s.w / 2, y: y + panelH / 2, w: s.w / 2 + 18, h: panelH / 2 + 24, color })
     drawLightHalo(ctx, halo, x + s.w / 2, y + panelH / 2, strength * (0.95 + 0.05 * Math.sin(t * 1.2 + s.seed)))
@@ -1044,7 +1077,8 @@ export class PixelView {
     this.ghostClock -= s.raw
     if (this.ghostClock <= 0 && r.joints) {
       this.ghostClock = 1 / r.style.fps
-      toCanvas(tint(r.raster(), [41, 243, 255]), this.ghostCanvas)
+      this.ghostBuf = tint(r.raster(), [41, 243, 255], this.ghostBuf)
+      toCanvas(this.ghostBuf, this.ghostCanvas)
     }
     if (!r.joints) return
     this.ctx.globalAlpha = 0.45
@@ -1154,7 +1188,8 @@ export class PixelView {
         if (r.joints) {
           const buf = r.raster()
           toCanvas(buf, this.runnerCanvas)
-          toCanvas(halo(buf), this.haloCanvas)
+          this.haloBuf = halo(buf, this.haloBuf)
+          toCanvas(this.haloBuf, this.haloCanvas)
           this.haloKey = null
           this.lastBuf = buf
         }
@@ -1172,7 +1207,8 @@ export class PixelView {
     if (streak && this.afterClock <= 0 && this.lastBuf) {
       this.afterClock = 0.045
       const cv = this.afterPool[this.afterIndex++ % this.afterPool.length]
-      toCanvas(tint(this.lastBuf, s.focusVis > 0.3 ? [120, 210, 255] : ACCENT), cv)
+      this.afterBuf = tint(this.lastBuf, s.focusVis > 0.3 ? [120, 210, 255] : ACCENT, this.afterBuf)
+      toCanvas(this.afterBuf, cv)
       this.after.unshift({ cv, wx: s.rx, wy: s.ry })
       if (this.after.length > 3) this.after.pop()
     }
@@ -1317,6 +1353,8 @@ export class PixelView {
 
   // Focus drains color from everything that isn't runner-vision red.
   postFocus(amount) {
+    this.focusFilter ??= new FocusFilter()
+    if (this.focusFilter.draw(this.ctx, amount)) return
     const img = this.ctx.getImageData(0, 0, this.W, H)
     const d = img.data
     for (let i = 0; i < d.length; i += 4) {
@@ -1334,8 +1372,9 @@ export class PixelView {
 const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
 // One pixel around a sprite's silhouette, as an opaque mask.
-function halo(buf) {
-  const out = new PixelBuffer(buf.w, buf.h)
+function halo(buf, out) {
+  if (!out || out.w !== buf.w || out.h !== buf.h) out = new PixelBuffer(buf.w, buf.h)
+  else out.data.fill(0)
   const on = pack([255, 255, 255])
   const solid = (x, y) => x >= 0 && y >= 0 && x < buf.w && y < buf.h && buf.data[y * buf.w + x] >>> 24
   for (let y = 0; y < buf.h; y++) {
@@ -1347,10 +1386,10 @@ function halo(buf) {
   return out
 }
 
-function tint(buf, color) {
-  const out = new PixelBuffer(buf.w, buf.h)
+function tint(buf, color, out) {
+  if (!out || out.w !== buf.w || out.h !== buf.h) out = new PixelBuffer(buf.w, buf.h)
   const c = pack(color)
-  for (let i = 0; i < buf.data.length; i++) if (buf.data[i] >>> 24) out.data[i] = c
+  for (let i = 0; i < buf.data.length; i++) out.data[i] = buf.data[i] >>> 24 ? c : 0
   return out
 }
 
