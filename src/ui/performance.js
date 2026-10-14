@@ -9,10 +9,10 @@ export class FrameMeter {
     this.el = document.createElement('div')
     this.el.className = 'frame-meter'
     this.el.textContent = 'FPS —'
-    this.el.title = 'Frame cadence / 95th percentile frame time / CPU work. F6 toggles.'
+    this.el.title = 'Frame cadence / 95th percentile frame time / CPU work. F8 toggles.'
     document.body.append(this.el)
     window.addEventListener('keydown', e => {
-      if (e.code !== 'F6') return
+      if (e.code !== 'F8') return
       e.preventDefault()
       if (!e.repeat) this.el.hidden = !this.el.hidden
     })
