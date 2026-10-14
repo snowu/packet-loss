@@ -26,6 +26,7 @@ import { chromium } from 'playwright'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { setTimeout as pause } from 'node:timers/promises'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
@@ -83,7 +84,7 @@ function pinWorld() {
 // Runs in the page: counts what the game asks of 2D canvases.
 function countWork() {
   const P = CanvasRenderingContext2D.prototype
-  const work = (window.__work = { main: {}, offscreen: {} })
+  const work = (window.__work = { main: {}, offscreen: {}, gpu: {} })
   const bump = (ctx, k) => {
     const into = ctx.canvas.classList.contains('pixel-canvas') ? work.main : work.offscreen
     into[k] = (into[k] ?? 0) + 1
@@ -97,17 +98,32 @@ function countWork() {
     const d = Object.getOwnPropertyDescriptor(P, prop)
     Object.defineProperty(P, prop, { get: d.get, set(v) { bump(this, `${prop}=`); d.set.call(this, v) } })
   }
+  const G = WebGLRenderingContext.prototype
+  for (const m of ['texImage2D', 'texSubImage2D', 'drawArrays']) {
+    const original = G[m]
+    G[m] = function (...args) { work.gpu[m] = (work.gpu[m] ?? 0) + 1; return original.apply(this, args) }
+  }
 }
 
-async function runScenario(browser, base, sc, pace) {
+async function runScenario(browser, base, sc, pace, tag = '') {
   const ctx = await browser.newContext({ viewport: { width: sc.view[0], height: sc.view[1] }, deviceScaleFactor: 3, isMobile: true, hasTouch: true })
   const page = await ctx.newPage()
+  // Benchmarks must not depend on Google Fonts availability or font swaps.
+  await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.abort())
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.addInitScript(pinWorld)
   await page.addInitScript(countWork)
   await page.goto(`${base}?seed=12345`)
-  await page.waitForFunction(() => window.__game)
+  // RAF and page timers are pinned above; poll from Node so startup cannot
+  // deadlock while the PNG loader is still finishing after the load event.
+  const deadline = Date.now() + 30000
+  let loaded = false
+  while (!loaded && Date.now() < deadline) {
+    loaded = await page.evaluate(() => !!window.__game)
+    if (!loaded) await pause(20)
+  }
+  if (!loaded) throw new Error(`${sc.name}: game did not load (${errors.join('; ') || 'startup timeout'})`)
   await page.evaluate(async (sc) => {
     const G = window.__game
     window.__seed(7)
@@ -122,7 +138,8 @@ async function runScenario(browser, base, sc, pace) {
   const frames = sc.frames ?? 600, warm = sc.warm ?? 120
   const cdp = await ctx.newCDPSession(page)
   if (sc.timed !== false) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
-  const result = await page.evaluate(async ({ sc, frames, warm, pace }) => {
+  if (args.profile) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start') }
+  const result = await page.evaluate(async ({ sc, frames, warm, pace, flush }) => {
     const G = window.__game, v = G.view
     const hold = () => {
       if (sc.trace && G.g.heist) G.g.heist.trace = 0.9
@@ -131,28 +148,37 @@ async function runScenario(browser, base, sc, pace) {
     for (let i = 0; i < warm; i++) { hold(); window.__tick(); if (pace) await window.__yield() }
     window.__work.main = {}
     window.__work.offscreen = {}
+    window.__work.gpu = {}
     const times = []
     for (let i = 0; i < frames; i++) {
       if (pace) await window.__yield()
       hold()
       const t0 = window.__realNow()
       window.__tick()
-      v.ctx.getImageData(0, 0, 1, 1)   // flush, so rasterizing is timed too
+      if (flush) {
+        v.ctx.getImageData(0, 0, 1, 1)   // flush, so rasterizing is timed too
+        if (v.focusFilter?.source) v.focusFilter.gl.finish()
+      }
       times.push(window.__realNow() - t0)
     }
     const per = (o) => Object.fromEntries(Object.entries(o).map(([k, n]) => [k, +(n / frames).toFixed(2)]))
     const main = per(window.__work.main)
-    main.getImageData = +(main.getImageData - 1).toFixed(2)   // minus our flush
+    main.getImageData = +((main.getImageData ?? 0) - (flush ? 1 : 0)).toFixed(2)   // minus our flush
     times.sort((a, b) => a - b)
     return {
       main,
       offscreen: per(window.__work.offscreen),
+      gpu: per(window.__work.gpu),
       cache: v.cache.size,
       mode: G.g.mode,
       x: Math.round(G.g.player.x),
       ms: { avg: times.reduce((a, b) => a + b, 0) / times.length, p50: times[times.length >> 1], p95: times[Math.floor(times.length * 0.95)], max: times.at(-1), slow: times.filter((t) => t > 33.4).length },
     }
-  }, { sc, frames, warm, pace })
+  }, { sc, frames, warm, pace, flush: !args['no-flush'] })
+  if (args.profile) {
+    const { profile } = await cdp.send('Profiler.stop')
+    writeFileSync(resolve(args.profile, `${sc.name}${tag ? `-${tag}` : ''}.cpuprofile`), JSON.stringify(profile))
+  }
   await ctx.close()
   if (errors.length) throw new Error(`${sc.name}: page errors\n${errors.join('\n')}`)
   return result
@@ -163,6 +189,7 @@ function counters(r) {
   const out = {}
   for (const [k, n] of Object.entries(r.main)) out[`canvas.${k}`] = n
   for (const [k, n] of Object.entries(r.offscreen)) out[`offscreen.${k}`] = n
+  for (const [k, n] of Object.entries(r.gpu ?? {})) out[`gpu.${k}`] = n
   out.cachedSprites = r.cache
   return out
 }
@@ -170,24 +197,40 @@ function counters(r) {
 const server = await createServer({ root, configFile: resolve(root, 'vite.config.js'), logLevel: 'error', server: { port: 0, strictPort: false } })
 await server.listen()
 const base = server.resolvedUrls.local[0]
-const browser = await chromium.launch()
+let comparisonServer
+if (args.compare) {
+  const comparisonRoot = resolve(args.compare)
+  comparisonServer = await createServer({ root: comparisonRoot, configFile: resolve(comparisonRoot, 'vite.config.js'), logLevel: 'error', server: { port: 0, strictPort: false } })
+  await comparisonServer.listen()
+}
+const browser = await chromium.launch({ executablePath: args.chromium || process.env.CHROMIUM_PATH || undefined })
 const results = {}
+const before = {}
 try {
   for (const sc of SCENARIOS) {
     if (args.only && !sc.name.includes(args.only)) continue
-    results[sc.name] = await runScenario(browser, base, sc, !args.check && !args.update)
+    if (comparisonServer) before[sc.name] = await runScenario(browser, comparisonServer.resolvedUrls.local[0], sc, !args.check && !args.update, 'before')
+    results[sc.name] = await runScenario(browser, base, sc, !args.check && !args.update, comparisonServer ? 'after' : '')
     const r = results[sc.name]
     const c = counters(r)
     const main = Object.entries(r.main).filter(([, n]) => n >= 0.05).map(([k, n]) => `${k} ${n}`).join(', ')
     console.log(`\n${sc.name}  (${r.mode} at x=${r.x})`)
-    if (sc.timed !== false) console.log(`  time @4x CPU   avg ${r.ms.avg.toFixed(2)} ms  p50 ${r.ms.p50.toFixed(2)}  p95 ${r.ms.p95.toFixed(2)}  worst ${r.ms.max.toFixed(1)}  frames over 33 ms: ${r.ms.slow}`)
+    if (sc.timed !== false) console.log(`  ${args['no-flush'] ? 'CPU submission' : 'time'} @4x CPU   avg ${r.ms.avg.toFixed(2)} ms  p50 ${r.ms.p50.toFixed(2)}  p95 ${r.ms.p95.toFixed(2)}  worst ${r.ms.max.toFixed(1)}  frames over 33 ms: ${r.ms.slow}`)
     console.log(`  canvas/frame   ${main}`)
     console.log(`  bakes/frame    ${c['offscreen.putImageData'] ?? 0}   cached sprites ${r.cache}`)
+    if (Object.keys(r.gpu).length) console.log(`  GPU/frame      ${Object.entries(r.gpu).map(([k, n]) => `${k} ${n}`).join(', ')}`)
+    if (before[sc.name] && sc.timed !== false) {
+      const b = before[sc.name]
+      console.log(`  before → after avg ${b.ms.avg.toFixed(2)} → ${r.ms.avg.toFixed(2)} ms; p95 ${b.ms.p95.toFixed(2)} → ${r.ms.p95.toFixed(2)}; over 33 ms ${b.ms.slow} → ${r.ms.slow}`)
+    }
   }
 } finally {
   await browser.close()
   await server.close()
+  await comparisonServer?.close()
 }
+
+if (args.json) writeFileSync(resolve(args.json), `${JSON.stringify(comparisonServer ? { before, after: results } : results, null, 2)}\n`)
 
 if (args.update) {
   const old = (() => { try { return JSON.parse(readFileSync(BASELINE, 'utf8')) } catch { return {} } })()

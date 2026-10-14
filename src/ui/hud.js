@@ -218,7 +218,7 @@ export class Hud {
           clearTimeout(this.jamTimer)
           this.jamTimer = setTimeout(() => this.el.trace.classList.remove('jam'), 260)
         }
-        this.el.traceFill.style.width = `${v}%`
+        this.el.traceFill.style.transform = `scaleX(${v / 100})`
         this.el.traceVal.textContent = `${v}%`
         this.el.trace.classList.toggle('hot', v >= 75)
       })

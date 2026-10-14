@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "bench": "node bench/bench.js",
-    "bench:check": "node bench/bench.js --check"
+    "bench:check": "node bench/bench.js --check",
+    "test:render": "node bench/verify.js"
   },
   "keywords": [],
   "author": "",

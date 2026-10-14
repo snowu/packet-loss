@@ -203,7 +203,7 @@ body.pixel .stats span { font: 400 10px/1 'Silkscreen', monospace; color: #8fa0c
 
 body.pixel .chip { backdrop-filter: none; -webkit-backdrop-filter: none; border-left-width: 6px; box-shadow: inset 0 -2px 0 var(--cyan), 4px 4px 0 rgba(0, 0, 0, 0.35); }
 /* the trial clock sits on open sky, which can be as bright as Smog Noon's: same plate */
-body.pixel .timer { padding: 5px 12px 3px; background: var(--glass); box-shadow: inset 0 -2px 0 var(--cyan), 4px 4px 0 rgba(0, 0, 0, 0.35); }
+body.pixel .timer { padding: 5px 12px 3px; background: var(--glass); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: inset 0 -2px 0 var(--cyan), 4px 4px 0 rgba(0, 0, 0, 0.35); }
 body.pixel .dist { font: 700 40px/1 'Pixelify Sans', monospace; text-shadow: -2px 0 rgba(41, 243, 255, 0.6), 2px 0 rgba(255, 47, 160, 0.6); }
 body.pixel .dist small { font: 400 14px/1 'Silkscreen', monospace; }
 body.pixel .sub, body.pixel .meter-label { font: 400 11px/1 'Silkscreen', monospace; letter-spacing: 0.04em; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
@@ -323,7 +323,7 @@ body.pixel .banner { color: #eef6ff; text-shadow: -2px 0 var(--pink), 2px 0 var(
 .trace-label { display: flex; gap: 8px; font: 400 11px/1 'Silkscreen', monospace; letter-spacing: 0.08em; color: #8fa0c8; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
 .trace-label b { color: #eef6ff; font-weight: 400; min-width: 4ch; }
 .trace { position: relative; width: min(220px, 36vw); height: 8px; background: rgba(10, 8, 26, 0.8); box-shadow: 0 0 0 2px rgba(255, 47, 160, 0.35); }
-.trace i { position: absolute; inset: 0 auto 0 0; width: 0%; background: repeating-linear-gradient(90deg, var(--pink) 0 6px, #b81f74 6px 8px); }
+.trace i { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left; background: repeating-linear-gradient(90deg, var(--pink) 0 6px, #b81f74 6px 8px); }
 .trace-wrap.hot .trace { box-shadow: 0 0 0 2px var(--red), 0 0 14px rgba(255, 59, 48, 0.7); animation: pulse-px 0.5s steps(2) infinite; }
 .trace-wrap.hot .trace i { background: repeating-linear-gradient(90deg, var(--red) 0 6px, #8a1410 6px 8px); }
 .trace-wrap.hot .trace-label, .trace-wrap.hot .trace-label b { color: var(--red); }
@@ -513,4 +513,17 @@ body.pixel .rotate { white-space: normal; text-align: center; width: max-content
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 620px) {
   /* the smallest phones: the arrows and name say enough */
   #title .city-pick span { display: none; }
+}
+.frame-meter {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 100;
+  padding: 4px 6px;
+  background: #080610cc;
+  color: #b7e5d3;
+  font: 10px monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  contain: content;
 }

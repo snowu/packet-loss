@@ -8,12 +8,12 @@
     "canvas.clip": 2.63,
     "canvas.getImageData": 0,
     "canvas.createLinearGradient": 0.04,
-    "offscreen.putImageData": 1.51,
+    "offscreen.putImageData": 1.43,
     "offscreen.globalCompositeOperation=": 1.25,
     "offscreen.drawImage": 0.42,
     "offscreen.fillStyle=": 0.42,
     "offscreen.fillRect": 0.42,
-    "cachedSprites": 107
+    "cachedSprites": 117
   },
   "endless": {
     "canvas.drawImage": 88.17,
@@ -28,7 +28,7 @@
     "offscreen.drawImage": 0.4,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
-    "cachedSprites": 113
+    "cachedSprites": 120
   },
   "endless-rain": {
     "canvas.drawImage": 91.17,
@@ -43,7 +43,7 @@
     "offscreen.drawImage": 0.4,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
-    "cachedSprites": 116
+    "cachedSprites": 123
   },
   "heist": {
     "canvas.drawImage": 84.2,
@@ -58,7 +58,7 @@
     "offscreen.drawImage": 0.4,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
-    "cachedSprites": 124
+    "cachedSprites": 128
   },
   "heist-rain-portrait": {
     "canvas.drawImage": 65.79,
@@ -73,7 +73,7 @@
     "offscreen.drawImage": 0.4,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
-    "cachedSprites": 107
+    "cachedSprites": 111
   },
   "heist-alarm-focus": {
     "canvas.drawImage": 88.58,
@@ -82,14 +82,15 @@
     "canvas.globalCompositeOperation=": 11.01,
     "canvas.save": 2.63,
     "canvas.clip": 2.63,
-    "canvas.getImageData": 1,
-    "canvas.putImageData": 1,
+    "canvas.getImageData": 0,
     "offscreen.putImageData": 1.18,
     "offscreen.globalCompositeOperation=": 1.21,
     "offscreen.drawImage": 0.4,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
-    "cachedSprites": 98
+    "gpu.texSubImage2D": 1,
+    "gpu.drawArrays": 1,
+    "cachedSprites": 100
   },
   "endless-long": {
     "canvas.drawImage": 94.62,
@@ -104,6 +105,6 @@
     "offscreen.drawImage": 0.39,
     "offscreen.fillStyle=": 0.39,
     "offscreen.fillRect": 0.39,
-    "cachedSprites": 126
+    "cachedSprites": 132
   }
 }

@@ -18,6 +18,7 @@ import { RUNNERS, RUNNER_STYLES } from './pixel/runner.js'
 import { localLab } from './lab/local.js'
 import { installAppUpdates } from './ui/update.js'
 import { installOffline } from './ui/offline.js'
+import { FrameMeter } from './ui/performance.js'
 
 const DEMO_SEED = 20261007
 const TOAST = {
@@ -41,6 +42,7 @@ const view = new PixelView()
 const input = new Input()
 const audio = new Audio()
 const hud = new Hud(isTouch)
+const frameMeter = new FrameMeter()
 hud.setMuted(audio.muted)
 let artLabOpen = false
 let artLabAudioRunning = false
@@ -833,10 +835,11 @@ let last = performance.now()
 let time = 0
 
 function frame(now) {
+  const workStart = performance.now()
   requestAnimationFrame(frame)
   const raw = Math.min(0.1, (now - last) / 1000)
   last = now
-  if (artLabOpen) return
+  if (artLabOpen || document.hidden) { frameMeter.reset(); return }
   time += raw
   input.pollGamepad()
   if (g.mode === 'title' && input.takeAny()) start(g.sel)
@@ -966,6 +969,7 @@ function frame(now) {
     focus: g.focusVis,
     playing: g.mode === 'run',
   })
+  frameMeter.sample(now, performance.now() - workStart)
 }
 
 // The HUD's second line, rebuilt only when what it shows changes:
@@ -995,4 +999,4 @@ toTitle()
 installOffline()
 const appUpdates = installAppUpdates({ canShow: () => !artLabOpen && ['title', 'paused', 'over'].includes(g.mode) })
 requestAnimationFrame(frame)
-if (import.meta.env.DEV) window.__game = { g, view, start, newRun, landCue }
+if (import.meta.env.DEV) window.__game = { g, view, start, newRun, landCue, frameMeter }
