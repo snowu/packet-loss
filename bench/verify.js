@@ -13,9 +13,9 @@ try {
   await page.goto(server.resolvedUrls.local[0])
   await page.waitForFunction(() => window.__game?.frameMeter.stats)
   assert.match(await page.locator('.frame-meter').textContent(), /\d+ FPS.*p95.*CPU/)
-  await page.keyboard.press('F6')
+  await page.keyboard.press('F8')
   assert.equal(await page.locator('.frame-meter').isVisible(), false)
-  await page.keyboard.press('F6')
+  await page.keyboard.press('F8')
   assert.equal(await page.locator('.frame-meter').isVisible(), true)
 
   const focus = await page.evaluate(async () => {
