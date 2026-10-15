@@ -2,7 +2,8 @@
 // bake worker can make them while the frame keeps drawing.
 import { PixelBuffer, pack, mix, dither, hash } from './pixels.js'
 
-export function bakeSky(W, H, pal) {
+// overcast: rain dulling the sky toward a color, as { color, alpha } (or null)
+export function bakeSky(W, H, pal, overcast = null) {
   const b = new PixelBuffer(W, H)
   const horizon = Math.round(H * 0.66)
   const bands = pal.sky
@@ -35,6 +36,21 @@ export function bakeSky(W, H, pal) {
           b.data[idx] = pack(mix(air, pal.sun, (1 - (d - r) / (r * 2)) ** 2 * 0.16))
         }
       }
+    }
+  }
+  if (overcast) {
+    // what filling the screen with the color at that alpha would leave,
+    // worked out once here instead of blended over every frame
+    const [or, og, ob] = overcast.color, a = Math.round(overcast.alpha * 255) / 255
+    const blended = new Map()
+    for (let i = 0; i < b.data.length; i++) {
+      const c = b.data[i]
+      let out = blended.get(c)
+      if (out === undefined) {
+        out = pack([(c & 255) + (or - (c & 255)) * a, ((c >>> 8) & 255) + (og - ((c >>> 8) & 255)) * a, ((c >>> 16) & 255) + (ob - ((c >>> 16) & 255)) * a])
+        blended.set(c, out)
+      }
+      b.data[i] = out
     }
   }
   return b

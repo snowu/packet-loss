@@ -9,9 +9,25 @@ export function mix(a, b, t) {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
 
+// Colors are asked for every frame, often with an alpha that drifts a little
+// each time. A canvas keeps 8 bits of alpha, so rounding to that loses
+// nothing, and handing back the same string for the same color lets the
+// browser skip parsing it and reuse its paint: a color that is new every
+// frame costs several times one it has seen before.
+const cssCache = new Map()
+
 export function css(c, a = 1) {
   const r = Math.round(c[0]), g = Math.round(c[1]), b = Math.round(c[2])
-  return a >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${a})`
+  const a8 = a >= 1 ? 255 : a > 0 ? Math.round(a * 255) : 0
+  if ((r | g | b) & ~255) return a8 === 255 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${a8 / 255})`
+  const key = (a8 * 16777216) + (b << 16) + (g << 8) + r
+  let s = cssCache.get(key)
+  if (s === undefined) {
+    if (cssCache.size >= 4096) cssCache.clear()
+    s = a8 === 255 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${+(a8 / 255).toFixed(4)})`
+    cssCache.set(key, s)
+  }
+  return s
 }
 
 // Little-endian RGBA packed into a Uint32 (what ImageData expects).

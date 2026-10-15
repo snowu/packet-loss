@@ -29,6 +29,20 @@ describe.each(['classic', 'courier', 'windbreaker', 'techwear'])('%s pixel runne
     expect(opaque).toBeGreaterThan(120)
     expect(opaque).toBeLessThan(900)
   })
+
+  it('draws the ghost silhouette over exactly the pixels the sprite covers', () => {
+    const r = new RunnerSprite(style)
+    const cyan = (255 << 24 | 255 << 16 | 243 << 8 | 41) >>> 0
+    let x = 0
+    for (const state of STATES) {
+      for (let i = 0; i < 12; i++) {
+        x += 1.5
+        r.update(1 / 30, { state, speed: 14, vy: -6, t: i * 0.03, kin: { t: i * 0.02, T: 0.3, mode: 'arc' } }, x * 14, 100, null)
+      }
+      const shape = Array.from(r.raster().data, (c) => (c >>> 24 ? cyan : 0))
+      expect(Array.from(r.silhouette([41, 243, 255]).data)).toEqual(shape)
+    }
+  })
 })
 
 describe('pixel palettes', () => {
