@@ -550,7 +550,25 @@ export class RunnerSprite {
     return out
   }
 
-  raster() {
+  // The runner's shape alone, outline included, in one flat color: what
+  // tint(raster()) gives, without working out the shading it would discard.
+  silhouette(color, out) {
+    const W = SPRITE_W, H = SPRITE_H
+    if (!out || out.w !== W || out.h !== H) out = new PixelBuffer(W, H)
+    this.cover()
+    const ids = this.ids, data = out.data, c = pack(color)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x
+        data[i] = ids[i] || (x > 0 && ids[i - 1]) || (x < W - 1 && ids[i + 1]) ||
+          (y > 0 && ids[i - W]) || (y < H - 1 && ids[i + W]) ? c : 0
+      }
+    }
+    return out
+  }
+
+  // Which part covers each sprite pixel (0 for none), into this.ids.
+  cover() {
     const W = SPRITE_W, H = SPRITE_H
     const ids = this.ids
     ids.fill(0)
@@ -614,6 +632,14 @@ export class RunnerSprite {
         }
       }
     }
+    return parts
+  }
+
+  raster() {
+    const W = SPRITE_W, H = SPRITE_H
+    const ids = this.ids
+    const parts = this.cover()
+    const face = this.cur.torso + this.cur.head + this.spin
 
     // colorize, rim light toward the light source, outline the silhouette
     const buf = this.buf
