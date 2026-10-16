@@ -570,22 +570,33 @@ export class PixelView {
 
   drawSky(pal, time) {
     const { ctx } = this
-    ctx.drawImage(this.now('sky', `${pal.version}:${this.W}x${H}`, () => ['sky', [this.W, H, pal]]), 0, 0)
+    // overcast: rain dulls the sky toward the haze. It's baked into the sky
+    // in 32 steps of rain rather than laid over the whole screen each frame.
     const wet = this.weather.rain
-    if (wet > 0.02) {
-      // overcast: the sky dulls toward the haze
-      ctx.fillStyle = css(mix(pal.haze, pal.sky[0], 0.3), wet * 0.45)
-      ctx.fillRect(0, 0, this.W, H)
-    }
+    const over = wet > 0.02 ? Math.max(1, Math.round(wet * 32)) / 32 : 0
+    const overcast = over ? { color: mix(pal.haze, pal.sky[0], 0.3), alpha: over * 0.45 } : null
+    ctx.drawImage(this.now('sky', `${pal.version}:${this.W}x${H}:${over}`, () => ['sky', [this.W, H, pal, overcast]]), 0, 0)
     const stars = pal.stars * (1 - wet)
     if (stars > 0.05) {
+      // where each star sits and how fast it twinkles only depend on the screen
+      if (this.starField?.W !== this.W || this.starField.H !== H) {
+        const n = 70, f = { W: this.W, H, x: new Int16Array(n), y: new Int16Array(n), rate: new Float64Array(n), tw: new Float64Array(n) }
+        for (let i = 0; i < n; i++) {
+          f.x[i] = Math.floor(hash(i, 1) * this.W)
+          f.y[i] = Math.floor(hash(i, 2) * H * 0.5)
+          f.rate[i] = 1 + hash(i, 3) * 3
+        }
+        this.starField = f
+      }
+      const f = this.starField
+      for (let i = 0; i < f.tw.length; i++) f.tw[i] = Math.sin(time * f.rate[i] + i)
       // one pass per colour; stars never overlap, so the order is free
       for (const bright of [false, true]) {
         ctx.fillStyle = bright ? '#ffffff' : '#c9c3ff'
-        for (let i = 0; i < 70; i++) {
-          const tw = Math.sin(time * (1 + hash(i, 3) * 3) + i)
+        for (let i = 0; i < f.tw.length; i++) {
+          const tw = f.tw[i]
           if (tw < 0.2 - stars * 0.6 || (tw > 0.8) !== bright) continue
-          ctx.fillRect(Math.floor(hash(i, 1) * this.W), Math.floor(hash(i, 2) * H * 0.5), 1, 1)
+          ctx.fillRect(f.x[i], f.y[i], 1, 1)
         }
       }
     }
@@ -1004,15 +1015,29 @@ export class PixelView {
       const x = this.sx(gate.x), y = this.sy(gate.y)
       // light column
       const col = finish ? [255, 47, 160] : passed ? [93, 255, 138] : [41, 243, 255]
-      ctx.fillStyle = css(col)
       const h = 64 + Math.round(Math.sin(t * 3) * 3)
-      for (let yy = 0; yy < h; yy++) {
-        for (let xx = -2; xx <= 2; xx++) {
-          if (dither(x + xx, y - yy + Math.floor(t * 20), (1 - yy / h) * (xx === 0 ? 0.9 : 0.35))) ctx.fillRect(x + xx, y - yy, 1, 1)
-        }
-      }
+      ctx.drawImage(this.gateColumn(col, h, x & 3, (y + Math.floor(t * 20)) & 3), x - 2, y - h + 1)
       ctx.drawImage(cv, x - (cv.width >> 1), y - cv.height)
     }
+  }
+
+  // A gate's dithered light column, h tall with its foot on the bottom row.
+  // The dither only depends on where the column sits modulo the 4x4 pattern
+  // (xm, ym), so the few variants are kept and the column goes down as one
+  // image instead of a pixel at a time.
+  gateColumn(col, h, xm, ym) {
+    const key = `${col}:${h}:${xm}:${ym}`
+    this.gateColumns ??= new Map()
+    let cv = this.gateColumns.get(key)
+    if (cv) return cv
+    const b = new PixelBuffer(5, h), c = pack(col)
+    for (let yy = 0; yy < h; yy++) {
+      for (let xx = -2; xx <= 2; xx++) {
+        if (dither(xm + xx, ym - yy, (1 - yy / h) * (xx === 0 ? 0.9 : 0.35))) b.set(xx + 2, h - 1 - yy, c)
+      }
+    }
+    this.gateColumns.set(key, cv = toCanvas(b))
+    return cv
   }
 
   // Heist layer behind the runner: data shards, security drones, wrecks,
@@ -1077,7 +1102,7 @@ export class PixelView {
     this.ghostClock -= s.raw
     if (this.ghostClock <= 0 && r.joints) {
       this.ghostClock = 1 / r.style.fps
-      this.ghostBuf = tint(r.raster(), [41, 243, 255], this.ghostBuf)
+      this.ghostBuf = r.silhouette([41, 243, 255], this.ghostBuf)
       toCanvas(this.ghostBuf, this.ghostCanvas)
     }
     if (!r.joints) return
@@ -1135,24 +1160,28 @@ export class PixelView {
   drawLaneHaze(pal) {
     if (this.laneRoof === undefined || this.classic) return
     const y = this.sy(this.laneRoof)
-    // the gradient is built once per palette at the origin and moved into place
-    const g = this.gradient('lane', pal, 64, css(pal.haze, 0), css(pal.haze, 0.42))
-    this.ctx.translate(0, y)
-    this.ctx.fillStyle = g
-    this.ctx.fillRect(0, -64, this.W, 64)
-    this.ctx.translate(0, -y)
+    this.ctx.drawImage(this.gradient('lane', pal, 64, css(pal.haze, 0), css(pal.haze, 0.42)), 0, 0, 1, 64, 0, y - 64, this.W, 64)
   }
 
-  // A vertical gradient from 0 to h, cached per palette.
+  // A vertical gradient from 0 to h, cached per palette as a 1px-wide strip
+  // and stretched into place. Filling with a gradient works out its color
+  // pixel by pixel, which costs a phone far more than copying the strip,
+  // and every pixel in a row comes out the same either way.
   gradient(name, pal, h, from, to) {
     this.gradients ??= new Map()
     const hit = this.gradients.get(name)
-    if (hit && hit.pal === pal) return hit.g
-    const g = this.ctx.createLinearGradient(0, name === 'lane' ? -h : 0, 0, name === 'lane' ? 0 : h)
+    if (hit && hit.pal === pal) return hit.strip
+    const strip = hit?.strip ?? document.createElement('canvas')
+    strip.width = 1
+    strip.height = h
+    const ctx = strip.getContext('2d')
+    const g = ctx.createLinearGradient(0, 0, 0, h)
     g.addColorStop(0, from)
     g.addColorStop(1, to)
-    this.gradients.set(name, { pal, g })
-    return g
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, 1, h)
+    this.gradients.set(name, { pal, strip })
+    return strip
   }
 
   // Lower floors sink into shadow below the lane, so lit windows and facade
@@ -1169,10 +1198,7 @@ export class PixelView {
       if (x > this.W || x + w < 0) continue
       const top = Math.max(this.sy(c.roof), lane) + 6
       if (top >= H) continue
-      ctx.translate(0, top)
-      ctx.fillStyle = grad
-      ctx.fillRect(x, 0, w, 48)
-      ctx.translate(0, -top)
+      ctx.drawImage(grad, 0, 0, 1, 48, x, top, w, 48)
       ctx.fillStyle = solid
       ctx.fillRect(x, top + 48, w, H - top - 48)
     }
@@ -1292,7 +1318,11 @@ export class PixelView {
       d.x += drift * s.dt * (d.near ? 1.4 : 1)
       if (d.y > H || d.x < -4) { d.y = -4; d.x = Math.random() * (this.W + 60) }
     }
-    const lit = []
+    // Lit drops take a tint stepped in eighths: on a 1px streak the steps
+    // don't show, and drops sharing a tint go out together. A color that
+    // changes every frame costs the canvas far more than one it reuses.
+    const lit = this.litDrops ??= new Map()
+    for (const group of lit.values()) group.length = 0
     for (let pass = 0; pass < 2; pass++) {
       const near = pass === 1
       ctx.fillStyle = near ? DROP_NEAR : DROP_FAR
@@ -1302,16 +1332,19 @@ export class PixelView {
         for (const lamp of this.lamps) {
           if (Math.abs(d.x - lamp.x) >= lamp.w || Math.abs(d.y - lamp.y) >= lamp.h) continue
           const distance = Math.hypot((d.x - lamp.x) / lamp.w, (d.y - lamp.y) / lamp.h)
-          if (distance < 1) color = mix(color ?? (near ? DROP_NEAR_RGB : DROP_FAR_RGB), lamp.color, (1 - distance) * pal.night * 0.7)
+          if (distance < 1) color = mix(color ?? (near ? DROP_NEAR_RGB : DROP_FAR_RGB), lamp.color, Math.round((1 - distance) * pal.night * 0.7 * 8) / 8)
         }
-        if (color) lit.push(d, color)
-        else ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, near ? 4 : 3)
+        if (!color) { ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, near ? 4 : 3); continue }
+        const style = css(color, near ? 0.75 : 0.45)
+        let group = lit.get(style)
+        if (!group) lit.set(style, group = [])
+        group.push(d)
       }
     }
-    for (let i = 0; i < lit.length; i += 2) {
-      const d = lit[i]
-      ctx.fillStyle = css(lit[i + 1], d.near ? 0.75 : 0.45)
-      ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, d.near ? 4 : 3)
+    for (const [style, group] of lit) {
+      if (!group.length) { lit.delete(style); continue }
+      ctx.fillStyle = style
+      for (const d of group) ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, d.near ? 4 : 3)
     }
     this.lightningClock -= s.raw
     if (this.lightningClock <= 0 && rain > 0.7) {
@@ -1327,12 +1360,16 @@ export class PixelView {
     if (k > 0 && Math.random() < k * 0.9) this.lines.push({ x: this.W + 4, y: Math.floor(Math.random() * H * 0.85), len: 8 + Math.random() * 26 })
     ctx.fillStyle = css(pal.light, 0.55)
     const v = s.p.speed * PPU * 2.2
-    this.lines = this.lines.filter((l) => {
+    // compacted in place: at speed there are dozens, every frame
+    const lines = this.lines
+    let kept = 0
+    for (const l of lines) {
       l.x -= v * s.raw
-      if (l.x + l.len < 0) return false
+      if (l.x + l.len < 0) continue
       ctx.fillRect(Math.round(l.x), l.y, Math.round(l.len), 1)
-      return true
-    })
+      lines[kept++] = l
+    }
+    lines.length = kept
   }
 
   // Signal interference: torn scanlines and a chromatic smear.
