@@ -6,6 +6,7 @@ import { Bot } from './sim/bot.js'
 import { ScoreKeeper, COMBO_WINDOW } from './sim/score.js'
 import { GhostRecorder, GhostPlayer } from './sim/ghost.js'
 import { TRACKS, dailyTrack, levelOptions } from './sim/tracks.js'
+import { COURSE_VERSION } from './sim/generator.js'
 import { HeistState, heistOptions } from './sim/heist.js'
 import { chromeById } from './sim/chrome.js'
 import { Input } from './input.js'
@@ -90,13 +91,19 @@ if (localLab) {
 
 const MODES = [{ kind: 'heist' }, { kind: 'endless' }, ...TRACKS.map((track) => ({ kind: 'trial', track })), { kind: 'trial', daily: true }]
 
+// Times, splits, ghosts and daily medals belong to one course layout: a new
+// generator version starts them afresh (the first layout used bare keys).
+const courseTag = COURSE_VERSION > 1 ? `v${COURSE_VERSION}.` : ''
+const medalsKey = (id) => `fil.medals.${courseTag}${id}`
+const pbKey = (id) => `fil.pb.${courseTag}${id}`
+
 // The daily course comes from the date when you look at it or start it, so a
 // page left open past midnight moves on. Its medals come from timing the
 // autopilot on it in a worker, cached for the day.
 const dailyMedals = { pending: null, worker: null }
 function dailyWithMedals() {
   const track = dailyTrack()
-  track.medals = store.json(`fil.medals.${track.id}`)
+  track.medals = store.json(medalsKey(track.id))
   if (!track.medals) requestDailyMedals(track)
   return track
 }
@@ -111,9 +118,9 @@ function requestDailyMedals(track) {
     dailyMedals.pending = null
     if (!medals) return
     try {
-      for (const key of Object.keys(localStorage)) if (key.startsWith('fil.medals.daily-')) localStorage.removeItem(key)
+      for (const key of Object.keys(localStorage)) if (key.startsWith('fil.medals.') && key.includes('daily-')) localStorage.removeItem(key)
     } catch { /* storage unavailable */ }
-    store.set(`fil.medals.${id}`, JSON.stringify(medals))
+    store.set(medalsKey(id), JSON.stringify(medals))
     if (g.track?.id === id) g.track.medals = medals
     if (g.mode === 'title') renderMenu()
   }
@@ -167,7 +174,7 @@ const g = {
 
 const endlessBest = () => Number(store.get('fil.best.endless', 0)) || 0
 const heistBest = () => store.json('fil.best.heist')
-const trialPB = (track) => store.json(`fil.pb.${track.id}`)
+const trialPB = (track) => store.json(pbKey(track.id))
 
 function menuItems() {
   return MODES.map((m) => {
@@ -687,7 +694,7 @@ function finishTrial() {
   const prev = g.pb
   const newBest = !prev || time < prev.time
   if (newBest) {
-    store.set(`fil.pb.${g.track.id}`, JSON.stringify({ time, splits: g.splits, ghost: g.recorder.data() }))
+    store.set(pbKey(g.track.id), JSON.stringify({ time, splits: g.splits, ghost: g.recorder.data() }))
   }
   g.result = {
     kind: 'trial', track: g.track.name, time, newBest, prevBest: prev?.time ?? null, prevSplits: prev?.splits ?? null,
