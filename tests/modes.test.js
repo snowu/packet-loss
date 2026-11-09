@@ -19,6 +19,23 @@ describe('checkpoints and finish', () => {
     expect(level.respawnPoint(10).x).toBe(0)
   })
 
+  it('keeps the roof a fall comes back to, however far past the checkpoint you got', () => {
+    const level = new Level(4242)
+    for (let x = 0; x < 1400; x += 5) {
+      level.ensure(x + 200)
+      level.pruneBehind(x, true)
+      const back = level.respawnPoint(x)
+      expect(level.roofAt(back.x)).not.toBeNull()
+    }
+    // and the city before the checkpoint still goes
+    expect(level.chunks[0].x1).toBeGreaterThan(level.respawnPoint(1400).x - 120)
+    // heist comes back on the roof you fell from, so it prunes by distance
+    const heist = new Level(4242)
+    heist.ensure(1600)
+    heist.pruneBehind(1400)
+    expect(heist.chunks[0].span[1]).toBeGreaterThanOrEqual(1310)
+  })
+
   it('gives every trial track a finish line near its length, on a clear roof', () => {
     for (const track of [...TRACKS, dailyTrack(new Date(2026, 9, 7))]) {
       const level = new Level(track.seed, levelOptions(track))

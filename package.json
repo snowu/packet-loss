@@ -11,6 +11,7 @@
     "bench": "node bench/bench.js",
     "bench:check": "node bench/bench.js --check",
     "bench:long": "node bench/longrun.js",
+    "bench:runs": "node bench/multirun.js",
     "bench:look": "node bench/pixeldiff.js",
     "test:render": "node bench/verify.js"
   },

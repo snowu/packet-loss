@@ -7,11 +7,14 @@ import { Level } from './level.js'
 import { Bot } from './bot.js'
 import { createPlayer, stepPlayer } from './player.js'
 import { HeistState, heistOptions } from './heist.js'
+import { createRng } from './rng.js'
 
 // careful: the autopilot steers around lasers and drone scans; otherwise it
 // runs the course as if they weren't there. chrome: ids installed one per
 // uplink, in order. every: seconds between samples.
-export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25, maxTime = 600 } = {}) {
+// slip: share of roofs (picked by seed) on which a careful autopilot stops
+// watching for security, to stand in for a player who isn't perfect.
+export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25, maxTime = 600, slip = 0 } = {}) {
   const level = new Level(seed, heistOptions())
   level.ensure(HEIST.SECTORS * HEIST.SECTOR_LEN + 120)
   const net = new HeistState(seed)
@@ -21,7 +24,14 @@ export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25,
   const samples = [], marks = []
   const sectors = [0, ...level.checkpoints.map((c) => c.x), level.finish.x]
   let t = 0, nextSample = 0, falls = 0
-  while (p.x < level.finish.x && t < maxTime) {
+  const slips = createRng((seed ^ 0x51f) >>> 0)
+  let roof = null
+  const payouts = []
+  while (p.x < level.finish.x && t < maxTime && net.integrity > 0) {
+    if (slip > 0 && careful) {
+      const here = level.roofStartBehind(p.x + 6).x
+      if (here !== roof) { roof = here; bot.heist = !slips.chance(slip) }
+    }
     events.length = 0
     stepPlayer(p, bot.input(p), PHYS.FIXED_DT, level, events)
     net.step(PHYS.FIXED_DT, p, level, events)
@@ -31,12 +41,13 @@ export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25,
       if (e.type === 'zap' || e.type === 'spotted' || e.type === 'traced' || e.type === 'takedown') marks.push({ type: e.type, x: p.x, t })
     }
     if (net.sector < level.checkpoints.length && p.x >= level.checkpoints[net.sector].x) {
-      net.advance()
+      payouts.push(net.advance())
+      net.openShop()
       if (chrome[net.sector - 1]) net.install(chrome[net.sector - 1])
     }
     if (!p.alive) {
       falls++
-      net.hurt()
+      net.fall()
       const r = level.roofStartBehind(p.x)
       p = createPlayer(r.x, r.y)
       p.speed = PHYS.SPEED_MIN
@@ -50,7 +61,7 @@ export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25,
   net.dispose()
   return {
     seed, careful, time: t, falls, sectors, samples, marks,
-    stats: { ...net.stats }, integrity: net.integrity, maxIntegrity: net.maxIntegrity,
+    stats: { ...net.stats }, integrity: net.integrity, maxIntegrity: net.maxIntegrity, creds: net.creds, payouts, sector: net.sector,
     extracted: p.x >= level.finish.x && net.integrity > 0,
   }
 }

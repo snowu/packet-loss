@@ -11,6 +11,8 @@ import { CHROME, chromeEffects, rollOffer, countOf } from './chrome.js'
 // Moves that jam the trace: the ones the city hands you. Slide jumps feed a
 // combo but can be repeated on any flat roof, so they don't jam.
 const JAMMING = new Set(['vault', 'roll', 'wallrun', 'walljump', 'zip', 'spring', 'padjump', 'grab', 'climb', 'landslide', 'airjump', 'clamber'])
+// Mistakes make noise: each one feeds the trace.
+const STUMBLES = new Set(['trip', 'bonk', 'hardland', 'shock'])
 
 // 0 at the minimum running speed, 1 at the speed that fully counts as flow.
 export function flowOf(speed) {
@@ -76,7 +78,10 @@ export class HeistState {
     this.owned = []
     this.offer = []
     this.repairs = 0
-    this.stats = { shards: 0, takedowns: 0, zaps: 0, spotted: 0, burns: 0, falls: 0 }
+    this.bought = 0             // chrome paid for this run
+    this.freePick = false       // the free piece at the current uplink is still unclaimed
+    this.leg = { time: 0, dirty: false, falls: 0 }   // the sector being run
+    this.stats = { shards: 0, takedowns: 0, zaps: 0, spotted: 0, burns: 0, falls: 0, clean: 0 }
     this.fx = chromeEffects([])
     setPhysMods({})
   }
@@ -87,10 +92,22 @@ export class HeistState {
   get canRepair() { return this.integrity < this.maxIntegrity && this.creds >= this.repairCost }
   get canReroll() { return this.creds >= this.rerollCost }
 
+  // What a piece on offer costs right now: nothing while the uplink's free
+  // pick is unclaimed.
+  priceOf(c) {
+    if (this.freePick) return 0
+    return (c.rare ? HEIST.CHROME_COST_RARE : HEIST.CHROME_COST) + HEIST.CHROME_COST_STEP * this.bought
+  }
+
+  canInstall(c) {
+    return !!c && countOf(this.owned, c.id) < c.max && this.creds >= this.priceOf(c)
+  }
+
   // ── street doc ──────────────────────────────────────────────────────────
 
   openShop() {
     this.offer = rollOffer(this.rng, this.owned)
+    this.freePick = true
     return this.offer
   }
 
@@ -109,25 +126,41 @@ export class HeistState {
     return true
   }
 
+  // Install a piece: the first at each uplink is free, the rest cost creds.
+  // What's left of the offer stays on the table.
   install(id) {
     const c = CHROME.find((x) => x.id === id)
-    if (!c || countOf(this.owned, id) >= c.max) return false
+    if (!this.canInstall(c)) return false
+    if (this.freePick) this.freePick = false
+    else {
+      this.creds -= this.priceOf(c)
+      this.bought++
+    }
     this.owned.push(id)
     this.fx = chromeEffects(this.owned)
     setPhysMods(this.fx.phys)
-    const max = HEIST.INTEGRITY + this.fx.run.maxIntegrity
-    if (max > this.maxIntegrity) {
-      this.integrity += max - this.maxIntegrity
-      this.maxIntegrity = max
-    }
-    this.offer = []
+    const max = Math.max(1, HEIST.INTEGRITY + this.fx.run.maxIntegrity)
+    if (max > this.maxIntegrity) this.integrity += max - this.maxIntegrity
+    this.maxIntegrity = max
+    this.integrity = Math.max(1, Math.min(this.integrity, max))
+    const i = this.offer.findIndex((o) => o?.id === id)
+    if (i >= 0) this.offer[i] = null
     return true
   }
 
-  // Reached the uplink at the end of the current sector.
+  // Reached the uplink at the end of the current sector: the sector pays out,
+  // and only part of the trace follows you through. Returns the payout.
   advance() {
+    const leg = this.leg
+    const clean = !leg.dirty && leg.falls === 0
+    const fast = leg.time <= HEIST.SECTOR_LEN / HEIST.SECTOR_PAR_SPEED
+    const creds = (clean ? HEIST.CLEAN_BONUS : 0) + (fast ? HEIST.FAST_BONUS : 0)
+    if (clean) this.stats.clean++
+    this.creds += creds
     this.sector++
-    this.trace = 0
+    this.trace *= HEIST.TRACE_CARRY
+    this.leg = { time: 0, dirty: false, falls: 0 }
+    return { clean, fast, creds, time: leg.time }
   }
 
   // Leave PHYS as we found it.
@@ -137,7 +170,8 @@ export class HeistState {
 
   // A scored move or event from the runner.
   move(type) {
-    if (JAMMING.has(type)) this.trace = Math.max(0, this.trace - HEIST.TRACE_MOVE)
+    if (JAMMING.has(type)) this.trace = Math.max(0, this.trace - HEIST.TRACE_MOVE * this.mods.moveJam)
+    else if (STUMBLES.has(type)) this.trace += HEIST.TRACE_STUMBLE
   }
 
   hurt() {
@@ -145,11 +179,20 @@ export class HeistState {
     return this.integrity
   }
 
+  // Fell off the city. Returns true when chrome caught it for free.
+  fall() {
+    this.stats.falls++
+    const free = this.leg.falls++ < this.mods.freeFalls
+    if (!free) this.hurt()
+    return free
+  }
+
   // Advance trace and resolve pickups and hazards against the runner. Events
   // are pushed in the same shape the player emits.
   step(dt, p, level, events) {
     const m = this.mods
     this.trace += traceRate(this.sector, p.speed) * m.traceRate * dt
+    this.leg.time += dt
     if (!p.alive) return
 
     const hw = 0.3
@@ -170,6 +213,7 @@ export class HeistState {
         if (l.tripped) continue
         if (l.x1 < bx0 || l.x0 > bx1 || l.y1 < by0 || l.y0 > by1) continue
         l.tripped = true
+        this.leg.dirty = true
         this.stats.zaps++
         this.trace += HEIST.TRACE_ZAP * m.zapTrace
         events.push({ type: 'zap', x: p.x, y: (l.y0 + l.y1) / 2, keepsCombo: m.zapKeepsCombo })
@@ -186,13 +230,15 @@ export class HeistState {
             p.vy = Math.max(p.vy, HEIST.TAKEDOWN_VY)
             p.jumpHoldActive = false
           }
-          events.push({ type: 'takedown', x: d.x, y: d.y })
+          if (m.takedownSpeed) p.speed = Math.min(PHYS.SPEED_MAX, p.speed + m.takedownSpeed)
+          events.push({ type: 'takedown', x: d.x, y: d.y, focus: m.takedownFocus })
         } else if (!d.passed && p.x > d.x + 0.6) {
           // judged once, as you go by: under the scanner you're seen,
           // clear over the top you're not
           d.passed = true
           if (by0 < d.y + HEIST.DRONE_H) {
             d.spotted = true
+            this.leg.dirty = true
             this.stats.spotted++
             this.trace += HEIST.TRACE_SPOT * m.spotTrace
             events.push({ type: 'spotted', x: d.x, y: d.y })
@@ -203,6 +249,7 @@ export class HeistState {
 
     if (this.trace >= 1) {
       this.trace = HEIST.TRACE_AFTER_BURN
+      this.leg.dirty = true
       this.stats.burns++
       this.hurt()
       events.push({ type: 'traced', x: p.x, y: p.y })

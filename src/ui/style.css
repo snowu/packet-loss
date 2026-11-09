@@ -361,6 +361,17 @@ body.pixel .banner { color: #eef6ff; text-shadow: -2px 0 var(--pink), 2px 0 var(
 .o-name { font: 700 20px/1.05 'Pixelify Sans', monospace; color: #eef6ff; }
 .o-name .stack { margin-left: 6px; font: 400 10px/1 'Silkscreen', monospace; color: var(--pink); vertical-align: middle; }
 .o-desc { font: 400 14px/1.25 'Pixelify Sans', monospace; color: #c8d4ee; }
+.offer li.deal { box-shadow: inset 0 0 0 2px rgba(255, 47, 160, 0.55); }
+.offer li.deal.sel { box-shadow: inset 0 0 0 2px var(--pink), 0 0 18px rgba(255, 47, 160, 0.4); }
+.offer li.deal .o-tag { color: var(--pink); }
+.offer li.off { opacity: 0.5; }
+.offer li.gone { cursor: default; opacity: 0.35; justify-content: center; align-items: center; box-shadow: inset 0 0 0 2px rgba(143, 160, 200, 0.25); background: none; }
+.offer li.gone .o-name { font: 400 10px/1 'Silkscreen', monospace; color: #8fa0c8; }
+.o-price { margin-top: auto; font: 400 11px/1 'Silkscreen', monospace; color: #ffe14d; }
+.shop-payout { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font: 400 10px/1 'Silkscreen', monospace; letter-spacing: 0.06em; color: #5f6c8f; }
+.shop-payout span.got { color: #5dff8a; }
+.chrome-row i.deal, .shop-owned i.deal { background: var(--pink); }
+.action.primary.sel { box-shadow: 0 4px 0 #0b6f80, 0 0 0 2px #05040d, 0 0 0 4px #eef6ff, 0 0 14px rgba(41, 243, 255, 0.6); }
 .shop-actions { margin-top: 12px; }
 .action.sel { box-shadow: 0 4px 0 #05040d, inset 0 0 0 2px var(--cyan), 0 0 14px rgba(41, 243, 255, 0.45); }
 .action.off { opacity: 0.45; }

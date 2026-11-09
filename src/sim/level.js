@@ -35,12 +35,26 @@ export class Level {
     }
   }
 
-  *chunksIn(x0, x1) {
-    for (const c of this.chunks) {
+  // Prune behind a runner at x. With keepCheckpoint, a fall returns to the
+  // last checkpoint, so the city from there on has to stay: pruned by
+  // distance alone, a fall far past a checkpoint would respawn in thin air.
+  pruneBehind(x, keepCheckpoint = false, margin = 90) {
+    this.prune(keepCheckpoint ? Math.min(x - margin, this.respawnPoint(x).x - 20) : x - margin)
+  }
+
+  // Chunks are in order along x, so the scan stops at the first one past
+  // the range. Asked for many times a physics step: a plain array, not a
+  // generator.
+  chunksIn(x0, x1) {
+    const out = []
+    const chunks = this.chunks
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i]
       if (c.span[1] < x0) continue
       if (c.span[0] > x1) break
-      yield c
+      out.push(c)
     }
+    return out
   }
 
   solidsIn(x0, x1) {
@@ -76,24 +90,33 @@ export class Level {
   }
 
   roofAt(x) {
-    for (const c of this.chunks) if (x >= c.x0 && x <= c.x1) return c.roof
+    const chunks = this.chunks
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i]
+      if (c.x0 > x) break
+      if (x <= c.x1) return c.roof
+    }
     return null
   }
 
   lowestRoofAhead(x, range = 45) {
     let low = Infinity
-    for (const c of this.chunks) {
-      if (c.x1 < x - 1 || c.x0 > x + range) continue
-      low = Math.min(low, c.roof)
+    const chunks = this.chunks
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i]
+      if (c.x0 > x + range) break
+      if (c.x1 >= x - 1) low = Math.min(low, c.roof)
     }
     return low === Infinity ? WORLD.ROOF_MIN : low
   }
 
   killY(x) {
     let low = Infinity
-    for (const c of this.chunks) {
-      if (c.x1 < x - 30 || c.x0 > x + 30) continue
-      low = Math.min(low, c.roof)
+    const chunks = this.chunks
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i]
+      if (c.x0 > x + 30) break
+      if (c.x1 >= x - 30) low = Math.min(low, c.roof)
     }
     if (low === Infinity) low = WORLD.ROOF_MIN
     return low - WORLD.KILL_DEPTH
