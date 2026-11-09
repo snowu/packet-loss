@@ -284,6 +284,14 @@ export class Audio {
     const ctx = this.ctx
     const spb = 60 / 128 / 4
     const I = this.intensity
+    // Frames stop while the tab is hidden but the audio clock doesn't: pick
+    // the score up from now rather than playing every missed beat at once
+    // (hundreds of oscillators in one frame).
+    if (this.nextBeat < ctx.currentTime - 0.25) {
+      const missed = Math.ceil((ctx.currentTime + 0.05 - this.nextBeat) / spb)
+      this.beat += missed
+      this.nextBeat += missed * spb
+    }
     while (this.nextBeat < ctx.currentTime + 0.2) {
       const t = this.nextBeat
       const b = this.beat

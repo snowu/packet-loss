@@ -31,6 +31,8 @@ const ZIP_UNDER = css(mix(ACCENT, [40, 6, 14], 0.5))
 const ZIP_CABLE = css(ACCENT)
 const ZIP_GLINT = css(mix(ACCENT, [255, 241, 215], 0.6))
 
+const NO_LIGHTS = []
+
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
@@ -96,6 +98,12 @@ export class PixelView {
     this.hide = { runner: false, course: false, decor: false }
     // classic: the look before the clarity pass, for side-by-side checks
     this.classic = false
+    // 0 full, 1 lean, 2 minimal: ornament the picture can lose when the
+    // device can't hold its frame rate (see Governor). Nothing the runner
+    // interacts with is ever dropped.
+    this.quality = 0
+    // set when the picture on the canvas is no longer what frame() would draw
+    this.stale = true
 
     window.addEventListener('resize', () => this.resize())
     this.resize()
@@ -116,13 +124,31 @@ export class PixelView {
     this.canvas.style.width = `${Math.round(this.W * scale)}px`
     this.canvas.style.height = `${Math.round(H * scale)}px`
     this.ctx.imageSmoothingEnabled = false
-    this.cache.delete('sky')
-    this.cache.delete('haze')
-    this.cache.delete('mist')
-    this.cache.delete('vignette')
-    this.cache.delete('alarm')
-    for (const key of [...this.cache.keys()]) if (key.startsWith('fog')) this.cache.delete(key)
+    this.stale = true
     for (const L of this.layers) L.fog = null
+    for (const key of ['sky', 'haze', 'mist', 'vignette', 'alarm']) this.forget(key)
+    for (const key of [...this.cache.keys()]) if (key.startsWith('fog')) this.forget(key)
+  }
+
+  // Drop a cached sprite and give its pixels back now. A canvas only frees
+  // its memory when the garbage collector gets to it, and with a heap this
+  // small that can be a long wait: a few runs' worth of dead facades is
+  // hundreds of megabytes on a phone. Emptying the canvas frees it at once.
+  forget(key) {
+    const hit = this.cache.get(key)
+    if (!hit) return
+    this.cache.delete(key)
+    hit.canvas.width = hit.canvas.height = 0
+  }
+
+  forgetAll(test) {
+    for (const key of [...this.cache.keys()]) if (test(key)) this.forget(key)
+    this.baker.drop(test)
+  }
+
+  // True while a redraw would change nothing: used to rest while paused.
+  get settled() {
+    return !this.stale && this.blend <= 0 && this.glitchAmt <= 0.01 && !this.baker.results.length && !this.baker.pending.size
   }
 
   // ── cached sprites, re-baked when the palette steps ─────────────────────
@@ -194,8 +220,9 @@ export class PixelView {
     // Course keys are c<id>:..., unlike clouds (cl...) and traffic (car...).
     // Keep those city sprites when restarting instead of rebaking them.
     const courseKey = key => /^c\d+:/.test(key)
-    for (const key of [...this.cache.keys()]) if (courseKey(key) || key.startsWith('L') || key.startsWith('bb')) this.cache.delete(key)
-    this.baker.drop((key) => courseKey(key) || key.startsWith('L') || key.startsWith('bb'))
+    this.forgetAll((key) => courseKey(key) || key.startsWith('L') || key.startsWith('bb'))
+    this.beams = []
+    this.stale = true
     this.views.clear()
     this.birds = []
     this.particles = []
@@ -241,8 +268,7 @@ export class PixelView {
 
   removeChunk(c) {
     this.views.delete(c)
-    for (const key of [...this.cache.keys()]) if (key.startsWith(`c${c.id}:`)) this.cache.delete(key)
-    this.baker.drop((key) => key.startsWith(`c${c.id}:`))
+    this.forgetAll((key) => key.startsWith(`c${c.id}:`))
     this.birds = this.birds.filter((b) => b.chunk !== c)
   }
 
@@ -285,6 +311,7 @@ export class PixelView {
   // ── events → effects ────────────────────────────────────────────────────
 
   burst(x, y, n, { spread = 1.2, up = 1.5, forward = 0, life = 0.6, color = null } = {}) {
+    n = Math.ceil(n * [1, 0.6, 0.4][this.quality])
     for (let i = 0; i < n; i++) {
       this.particles.push({
         x: x + (Math.random() - 0.5) * 0.6, y: y + Math.random() * 0.15,
@@ -385,8 +412,10 @@ export class PixelView {
   setClassic(on) {
     if (on === this.classic) return
     this.classic = on
-    this.cache.clear()
-    this.baker.drop(() => true)
+    for (const L of this.layers) L.fog = null
+    this.beams = []
+    this.forgetAll(() => true)
+    this.stale = true
     this.rebakeAll = true
   }
 
@@ -473,6 +502,7 @@ export class PixelView {
   frame(s) {
     const pal = paletteAt(s.paletteD ?? s.distance)
     this.pal = pal
+    this.stale = false
     this.budget = this.rebakeAll ? Infinity : 2
     this.budget -= this.baker.flush(1)
     this.rebakeAll = false
@@ -542,6 +572,8 @@ export class PixelView {
       ctx.globalAlpha = 1
       this.blend -= s.raw * 2.5
     }
+    // out of sprite budget: some of what was drawn is a version behind
+    if (this.budget <= 0) this.stale = true
   }
 
   // Weather comes and goes on its own during a run. Districts that tend to
@@ -577,7 +609,7 @@ export class PixelView {
     const overcast = over ? { color: mix(pal.haze, pal.sky[0], 0.3), alpha: over * 0.45 } : null
     ctx.drawImage(this.now('sky', `${pal.version}:${this.W}x${H}:${over}`, () => ['sky', [this.W, H, pal, overcast]]), 0, 0)
     const stars = pal.stars * (1 - wet)
-    if (stars > 0.05) {
+    if (stars > 0.05 && this.quality < 2) {
       // where each star sits and how fast it twinkles only depend on the screen
       if (this.starField?.W !== this.W || this.starField.H !== H) {
         const n = 70, f = { W: this.W, H, x: new Int16Array(n), y: new Int16Array(n), rate: new Float64Array(n), tw: new Float64Array(n) }
@@ -604,12 +636,12 @@ export class PixelView {
 
   drawClouds(pal, time) {
     const density = Math.max(pal.clouds, this.weather.rain)
-    if (density < 0.05) return
+    if (density < 0.05 || this.quality >= 2) return
     const C = this.clouds
     const f = 0.03
     const off = this.camPX * f + time * 2
     if (C.cursor === null || C.cursor < off - 200) C.cursor = off - 60
-    while (C.items.length && C.items[0].u + C.items[0].w - off < -40) this.cache.delete(`cl${C.items.shift().seed}`)
+    while (C.items.length && C.items[0].u + C.items[0].w - off < -40) this.forget(`cl${C.items.shift().seed}`)
     while (C.cursor - off < this.W + 40) {
       const w = C.rng.int(30, 80), h = C.rng.int(10, 22)
       C.cursor += C.rng.range(30, 140) / density
@@ -665,9 +697,9 @@ export class PixelView {
   }
 
   forgetTower(li, seed) {
-    this.cache.delete(`L${li}:${seed}`)
+    this.forget(`L${li}:${seed}`)
     this.baker.drop((key) => key === `L${li}:${seed}`)
-    for (const f of ['halo', 0, 1, 2]) this.cache.delete(`bb${seed}:${f}`)
+    for (const f of ['halo', 0, 1, 2]) this.forget(`bb${seed}:${f}`)
   }
 
   // Billboards on skyline towers: on top, hung off a side, or across the face.
@@ -701,13 +733,18 @@ export class PixelView {
     if (this.lightKeys.size > 16) {
       const old = this.lightKeys.keys().next().value
       this.lightKeys.delete(old)
-      this.cache.delete(old)
+      this.forget(old)
       this.baker.drop(key => key === old)
     }
-    const halo = this.now(haloKey, 0, () => ['lightHalo', [s.w + 64, panelH + 52, color]])
-    const strength = pal.night * (s.place === 'far' || s.place === 'near' ? 0.48 : 0.95) * (0.65 + this.weather.rain * 0.35)
+    const skyline = s.place === 'far' || s.place === 'near'
     if (s.place === 'facade' || s.place === 'roof') this.lamps.push({ x: x + s.w / 2, y: y + panelH / 2, w: s.w / 2 + 18, h: panelH / 2 + 24, color })
-    drawLightHalo(ctx, halo, x + s.w / 2, y + panelH / 2, strength * (0.95 + 0.05 * Math.sin(t * 1.2 + s.seed)))
+    // the glow is a blended layer per sign: the skyline's go first when the
+    // device is struggling, then the rest
+    if (this.quality < (skyline ? 1 : 2)) {
+      const halo = this.now(haloKey, 0, () => ['lightHalo', [s.w + 64, panelH + 52, color]])
+      const strength = pal.night * (skyline ? 0.48 : 0.95) * (0.65 + this.weather.rain * 0.35)
+      drawLightHalo(ctx, halo, x + s.w / 2, y + panelH / 2, strength * (0.95 + 0.05 * Math.sin(t * 1.2 + s.seed)))
+    }
     const get = (f) => this.sprite(`${key}:${f}`, pal.version, () => bakeBillboard(s, pal, f))
     const h1 = hash(s.seed, 79)
     // Signs attached to the running building read as fixtures. Keep their
@@ -790,7 +827,17 @@ export class PixelView {
     const visible = []
     for (const c of level.chunksIn(left, right)) {
       const v = this.views.get(c)
-      if (v) visible.push([c, v])
+      if (v) { visible.push([c, v]); v.asleep = false }
+    }
+    // The level keeps the city back to the last checkpoint for respawns;
+    // its sprites don't need to wait there too. Roofs well behind the
+    // screen give theirs up and bake again if a fall brings them back.
+    for (const c of level.chunks) {
+      if (c.span[1] >= left - 60) break
+      const v = this.views.get(c)
+      if (!v || v.asleep) continue
+      v.asleep = true
+      this.forgetAll((key) => key.startsWith(`c${c.id}:`))
     }
     // the next screen of buildings bakes in the background before it shows
     if (this.baker.ready && this.budget !== Infinity) {
@@ -834,7 +881,7 @@ export class PixelView {
       const cv = this.now(`c${c.id}:b`, ver, () => this.facadeJob(c, v, pal))
       ctx.drawImage(cv, this.sx(c.x0), this.sy(c.roof) - v.roofH)
       const lights = (v.lights = this.chunkLights(c, v, pal))
-      drawRoofSurface(ctx, { x: this.sx(c.x0), y: this.sy(c.roof), w, depth: v.roofH, seed: c.seed, pal, wet: this.weather.wet, rain: this.weather.rain, time: this.cam.time, lights })
+      drawRoofSurface(ctx, { x: this.sx(c.x0), y: this.sy(c.roof), w, depth: v.roofH, seed: c.seed, pal, wet: this.weather.wet, rain: this.weather.rain, time: this.cam.time, lights: this.quality < 2 ? lights : NO_LIGHTS })
     }
     // advertising on the facades, and billboards standing on the roofs
     const t = this.cam.time
@@ -866,7 +913,7 @@ export class PixelView {
         if (bx > this.W || bx + cv.width < 0) continue
         drawContactShadow(ctx, bx + 2, by + cv.height, cv.width - 4, pal, 2)
         ctx.drawImage(cv, bx, by)
-        if (['vents', 'ac'].includes(d.type) && hash(c.seed, Math.floor(d.x * PPU), 52) < 0.4) drawSteam(ctx, bx + cv.width / 2, by + 2, c.seed + Math.floor(d.x), this.cam.time, pal)
+        if (this.quality < 1 && ['vents', 'ac'].includes(d.type) && hash(c.seed, Math.floor(d.x * PPU), 52) < 0.4) drawSteam(ctx, bx + cv.width / 2, by + 2, c.seed + Math.floor(d.x), this.cam.time, pal)
         if (d.type === 'antenna' && Math.sin(this.cam.time * 3 + d.x) > 0.4) {
           ctx.fillStyle = css(ACCENT)
           ctx.fillRect(bx + 5, by - 1, 3, 3)
@@ -1228,7 +1275,7 @@ export class PixelView {
     const x = this.sx(s.rx) - ORIGIN_X
     const y = this.sy(s.ry) - ORIGIN_Y
     // afterimages at speed and in focus
-    const streak = (s.p.speed > 14 && s.mode === 'run') || s.focusVis > 0.3
+    const streak = this.quality < 2 && ((s.p.speed > 14 && s.mode === 'run') || s.focusVis > 0.3)
     this.afterClock -= s.raw
     if (streak && this.afterClock <= 0 && this.lastBuf) {
       this.afterClock = 0.045
@@ -1295,7 +1342,7 @@ export class PixelView {
     }
     // heat shimmer sparks rising from the lava streets
     this.ctx.fillStyle = css(mix(pal.lava, [255, 230, 160], 0.5))
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < (this.quality < 2 ? 24 : 0); i++) {
       const x = Math.floor((hash(i, 9) * this.W + time * 10 * (0.5 + hash(i, 4))) % this.W)
       const rise = (time * (8 + hash(i, 5) * 10) + hash(i, 6) * 60) % 60
       const y = top + cv.height - rise
@@ -1307,7 +1354,7 @@ export class PixelView {
     const { ctx } = this
     const rain = this.weather.rain
     if (rain < 0.05) { this.drops.length = 0; this.lightning = 0; return }
-    const n = Math.floor(160 * rain)
+    const n = Math.floor(160 * rain * [1, 0.6, 0.35][this.quality])
     if (this.drops.length > n) this.drops.length = n
     while (this.drops.length < n) this.drops.push({ x: Math.random() * this.W, y: Math.random() * H, v: 260 + Math.random() * 160, near: Math.random() < 0.3 })
     const drift = -(s.p.speed * PPU * 0.5 + 30)
@@ -1329,7 +1376,7 @@ export class PixelView {
       for (const d of this.drops) {
         if (d.near !== near) continue
         let color = null
-        for (const lamp of this.lamps) {
+        if (this.quality === 0) for (const lamp of this.lamps) {
           if (Math.abs(d.x - lamp.x) >= lamp.w || Math.abs(d.y - lamp.y) >= lamp.h) continue
           const distance = Math.hypot((d.x - lamp.x) / lamp.w, (d.y - lamp.y) / lamp.h)
           if (distance < 1) color = mix(color ?? (near ? DROP_NEAR_RGB : DROP_FAR_RGB), lamp.color, Math.round((1 - distance) * pal.night * 0.7 * 8) / 8)
@@ -1357,7 +1404,7 @@ export class PixelView {
   drawSpeedLines(s, pal) {
     const { ctx } = this
     const k = s.mode === 'run' ? s.speedK : 0
-    if (k > 0 && Math.random() < k * 0.9) this.lines.push({ x: this.W + 4, y: Math.floor(Math.random() * H * 0.85), len: 8 + Math.random() * 26 })
+    if (k > 0 && Math.random() < k * [0.9, 0.5, 0.25][this.quality]) this.lines.push({ x: this.W + 4, y: Math.floor(Math.random() * H * 0.85), len: 8 + Math.random() * 26 })
     ctx.fillStyle = css(pal.light, 0.55)
     const v = s.p.speed * PPU * 2.2
     // compacted in place: at speed there are dozens, every frame

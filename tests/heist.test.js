@@ -96,6 +96,7 @@ describe('chrome', () => {
 
   it('gives a mid-air jump with tendons', () => {
     const net = new HeistState(1)
+    net.openShop()
     net.install('tendons')
     const solids = [{ id: 1, kind: 'roof', x0: -10, x1: 1000, y0: -70, y1: 0 }]
     const level = { solidsIn: () => solids, wallrunsIn: () => [], ziplinesIn: () => [], killY: () => -20, roofAt: () => 0, lowestRoofAhead: () => -5 }
@@ -225,6 +226,86 @@ describe('heist state', () => {
     expect(net.integrity).toBe(3)
   })
 
+  it('gives the first piece at an uplink free and sells the rest, dearer each time', () => {
+    const net = new HeistState(4)
+    net.openShop()
+    const [a, b, c] = net.offer
+    expect(net.priceOf(a)).toBe(0)
+    expect(net.install(a.id)).toBe(true)
+    expect(net.offer).toEqual([null, b, c])          // the rest stays on the table
+    const price = net.priceOf(b)
+    expect(price).toBe(b.rare ? HEIST.CHROME_COST_RARE : HEIST.CHROME_COST)
+    expect(net.install(b.id)).toBe(false)            // no creds, no chrome
+    net.creds = price
+    expect(net.install(b.id)).toBe(true)
+    expect(net.creds).toBe(0)
+    expect(net.priceOf(c)).toBe((c.rare ? HEIST.CHROME_COST_RARE : HEIST.CHROME_COST) + HEIST.CHROME_COST_STEP)
+    // a new uplink brings a new free pick
+    net.openShop()
+    expect(net.priceOf(net.offer[0])).toBe(0)
+  })
+
+  it('pays out a clean, fast sector and carries part of the trace through the uplink', () => {
+    const net = new HeistState(4)
+    const level = { chunksIn: () => [] }
+    const p = createPlayer(0, 0)
+    p.speed = 16
+    net.trace = 0.6
+    net.step(1, p, level, [])
+    const pay = net.advance()
+    expect(pay).toMatchObject({ clean: true, fast: true, creds: HEIST.CLEAN_BONUS + HEIST.FAST_BONUS })
+    expect(net.creds).toBe(pay.creds)
+    expect(net.trace).toBeGreaterThan(0.25)
+    expect(net.trace).toBeLessThan(0.4)
+    // a fall, or dawdling, loses the bonus for that sector only
+    net.fall()
+    net.step(HEIST.SECTOR_LEN / HEIST.SECTOR_PAR_SPEED + 1, p, level, [])
+    expect(net.advance()).toMatchObject({ clean: false, fast: false, creds: 0 })
+    expect(net.advance().clean).toBe(true)
+  })
+
+  it('hears stumbles: a trip or a hard landing feeds the trace', () => {
+    const net = new HeistState(4)
+    net.move('trip')
+    net.move('hardland')
+    expect(net.trace).toBeCloseTo(HEIST.TRACE_STUMBLE * 2)
+    net.move('vault')
+    expect(net.trace).toBeCloseTo(HEIST.TRACE_STUMBLE * 2 - HEIST.TRACE_MOVE)
+  })
+
+  it('deals cut both ways', () => {
+    const net = new HeistState(4)
+    net.creds = 1000
+    net.openShop()
+    expect(net.install('plating')).toBe(true)
+    expect(net.install('overdrive')).toBe(true)
+    expect(net.maxIntegrity).toBe(HEIST.INTEGRITY)   // plating +1, overdrive -1
+    expect(net.integrity).toBe(HEIST.INTEGRITY)
+    expect(net.mods.moveJam).toBe(2)
+    expect(net.install('hotwire')).toBe(true)
+    expect(net.mods.shardValue).toBe(3)
+    expect(net.mods.traceRate).toBeCloseTo(1.3)
+    // overdrive never takes the last point of integrity
+    const frail = new HeistState(5)
+    frail.integrity = 1
+    frail.openShop()
+    frail.install('overdrive')
+    expect(frail.integrity).toBe(1)
+    expect(frail.maxIntegrity).toBe(HEIST.INTEGRITY - 1)
+  })
+
+  it('catches the first fall of a sector with Second Wind', () => {
+    const net = new HeistState(4)
+    net.openShop()
+    net.install('secondwind')
+    expect(net.fall()).toBe(true)
+    expect(net.integrity).toBe(HEIST.INTEGRITY)
+    expect(net.fall()).toBe(false)
+    expect(net.integrity).toBe(HEIST.INTEGRITY - 1)
+    net.advance()
+    expect(net.fall()).toBe(true)
+  })
+
   it('lets shards extend a combo without growing the multiplier', () => {
     const s = new ScoreKeeper()
     s.event('shard', 10)
@@ -247,6 +328,43 @@ describe('chrome balance', () => {
     const ghosted = mean(['ghost', 'ghost'])
     expect(ghosted).toBeLessThan(plain - 0.15)
     expect(ghosted).toBeGreaterThan(0.2)
+  }, 180000)
+})
+
+describe('heist balance', () => {
+  // The trace has to matter to everyone: a clean run feels it rise sector by
+  // sector without burning, a sloppy one gets burned, and ignoring security
+  // altogether doesn't see the last sector.
+  const seeds = [1000, 8919, 16838, 24757]
+  const runs = (options) => seeds.map((seed) => simulateHeist(seed, options))
+  const mean = (list, f) => list.reduce((sum, r) => sum + f(r), 0) / list.length
+  const peak = (r, sector) => Math.max(0, ...r.samples.filter((s) => s.sector === sector).map((s) => s.trace))
+
+  it('builds from a quiet first sector to a hot last one for a clean runner', () => {
+    const clean = runs({})
+    expect(clean.every((r) => r.extracted && r.stats.burns === 0)).toBe(true)
+    expect(mean(clean, (r) => peak(r, 0))).toBeLessThan(0.4)
+    expect(mean(clean, (r) => peak(r, 4))).toBeGreaterThan(mean(clean, (r) => peak(r, 0)) + 0.15)
+    // and the run pays: enough creds for a few extra pieces, not all of them
+    const creds = mean(clean, (r) => r.creds)
+    expect(creds).toBeGreaterThan(HEIST.CHROME_COST * 4)
+    expect(creds).toBeLessThan(HEIST.CHROME_COST * 14)
+  }, 180000)
+
+  it('burns sloppy runners and stops careless ones', () => {
+    const sloppy = runs({ slip: 0.5 })
+    expect(mean(sloppy, (r) => r.stats.burns)).toBeGreaterThanOrEqual(1)
+    expect(sloppy.some((r) => r.extracted)).toBe(true)
+    const careless = runs({ careful: false })
+    expect(careless.every((r) => !r.extracted)).toBe(true)
+  }, 180000)
+
+  it('stays traversable with every speed piece installed', () => {
+    for (const seed of seeds.slice(0, 2)) {
+      const run = simulateHeist(seed, { chrome: ['overdrive', 'calves', 'calves', 'calves'] })
+      expect(run.extracted).toBe(true)
+      expect(run.falls).toBeLessThanOrEqual(1)
+    }
   }, 180000)
 })
 

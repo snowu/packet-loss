@@ -114,6 +114,8 @@ export const HEIST = {
   TRACE_ZAP: 0.22,
   TRACE_SPOT: 0.14,
   TRACE_TAKEDOWN: 0.08,
+  TRACE_STUMBLE: 0.06,   // a trip, a bonk or a hard landing is noise security hears
+  TRACE_CARRY: 0.5,      // share of the meter that follows you through an uplink
   TRACE_AFTER_BURN: 0.4, // where the meter drops after ICE burns you
   SHARD_RADIUS: 0.45,
   SHARD_EDDIES: 5,
@@ -123,6 +125,15 @@ export const HEIST = {
   REPAIR_COST: 60,
   REPAIR_STEP: 30,
   REROLL_COST: 30,
+  // the first piece of chrome at an uplink is free; more cost creds, and each
+  // one bought in a run raises the price of the next
+  CHROME_COST: 70,
+  CHROME_COST_RARE: 120,
+  CHROME_COST_STEP: 25,
+  // sector payouts at the uplink
+  CLEAN_BONUS: 40,       // no laser tripped, never spotted or burned, no fall
+  FAST_BONUS: 25,        // through the sector at SECTOR_PAR_SPEED or better
+  SECTOR_PAR_SPEED: 13.5,
 }
 
 export const FOCUS = {

@@ -19,7 +19,7 @@ import { RUNNERS, RUNNER_STYLES } from './pixel/runner.js'
 import { localLab } from './lab/local.js'
 import { installAppUpdates } from './ui/update.js'
 import { installOffline } from './ui/offline.js'
-import { FrameMeter } from './ui/performance.js'
+import { FrameMeter, Governor, QUALITY_NAMES } from './ui/performance.js'
 
 const DEMO_SEED = 20261007
 const TOAST = {
@@ -27,6 +27,7 @@ const TOAST = {
   zip: 'ZIPLINE', spring: 'LAUNCH', padjump: 'PAD JUMP', grab: 'LEDGE', climb: 'WALL CLIMB', slidejump: 'SLIDE JUMP', landslide: 'LANDING SLIDE', airjump: 'AIR JUMP',
 }
 
+const params = new URLSearchParams(location.search)
 const store = {
   get(key, fallback) { try { return localStorage.getItem(key) ?? fallback } catch { return fallback } },
   set(key, value) { try { localStorage.setItem(key, value) } catch { /* storage unavailable */ } },
@@ -34,7 +35,6 @@ const store = {
 }
 
 const isTouch = window.matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints > 0
-const params = new URLSearchParams(location.search)
 const fixedSeed = params.has('seed') ? Number(params.get('seed')) : null
 
 // the sprite PNGs (public/art) must be in before the first sprite is baked and cached
@@ -44,6 +44,9 @@ const input = new Input()
 const audio = new Audio()
 const hud = new Hud(isTouch)
 const frameMeter = new FrameMeter()
+// ?quality=0|1|2 pins the picture quality; otherwise it follows the device
+const governor = new Governor({ pin: params.has('quality') ? Math.max(0, Math.min(2, Number(params.get('quality')) || 0)) : null })
+view.quality = governor.level
 hud.setMuted(audio.muted)
 let artLabOpen = false
 let artLabAudioRunning = false
@@ -306,6 +309,8 @@ function newRun() {
   g.score = new ScoreKeeper()
   g.score.teleport(g.player.x)
   g.lives = RUN.LIVES
+  g.cleanLeg = true
+  g.payout = null
   g.fade = 1
   view.passed = 0
 
@@ -394,7 +399,9 @@ const playing = () => ['countdown', 'run', 'respawn', 'finish', 'paused', 'over'
 
 input.on('nav', (d) => {
   if (g.mode === 'shop') {
-    g.shopSel = (g.shopSel + d + 5) % 5
+    // step over slots whose chrome is already installed
+    do g.shopSel = (g.shopSel + d + SHOP_ITEMS) % SHOP_ITEMS
+    while (g.shopSel < 3 && !g.heist.offer[g.shopSel] && g.heist.offer.some(Boolean))
     renderShop()
     return
   }
@@ -529,6 +536,7 @@ function heistEvent(e) {
       break
     case 'takedown':
       hud.toast('TAKEDOWN')
+      if (e.focus) g.focus = Math.min(1, g.focus + e.focus)
       break
     case 'traced':
       hud.toast('ICE BURN', 'INTEGRITY −1')
@@ -543,9 +551,14 @@ function heistEvent(e) {
   }
 }
 
+// The street doc: slots 0-2 are the chrome on offer, then repair, reroll and
+// jacking back in.
+const SHOP_ITEMS = 6
+const SHOP_LEAVE = 5
+
 function openShop() {
   const n = g.heist
-  n.advance()
+  g.payout = n.advance()
   n.openShop()
   if (g.score.bank() === 'bank') hud.comboResult('bank', g.score.log.at(-1).points)
   g.mode = 'shop'
@@ -566,7 +579,9 @@ function renderShop() {
     creds: n.creds,
     integrity: n.integrity,
     maxIntegrity: n.maxIntegrity,
-    offer: n.offer.map((c) => ({ ...c, have: n.owned.filter((o) => o === c.id).length })),
+    offer: n.offer.map((c) => c && { ...c, have: n.owned.filter((o) => o === c.id).length, price: n.priceOf(c), ok: n.canInstall(c) }),
+    free: n.freePick,
+    payout: g.payout, cleanBonus: HEIST.CLEAN_BONUS, fastBonus: HEIST.FAST_BONUS,
     repair: { cost: n.repairCost, ok: n.canRepair, full: n.integrity >= n.maxIntegrity },
     reroll: { cost: n.rerollCost, ok: n.canReroll },
     owned: n.owned.map(chromeById),
@@ -577,15 +592,7 @@ function shopAction(i) {
   if (g.mode !== 'shop') return
   const n = g.heist
   g.shopSel = i
-  if (i < 3) {
-    const c = n.offer[i]
-    if (!c && n.offer.length) return
-    if (c) {
-      n.install(c.id)
-      g.score.window = COMBO_WINDOW + n.mods.comboBonus
-      audio.event('install')
-      hud.toast(c.name.toUpperCase(), 'INSTALLED')
-    }
+  if (i === SHOP_LEAVE) {
     hud.showShop(false)
     hud.chrome(n.owned.map(chromeById))
     hud.setLives(n.maxIntegrity)
@@ -593,6 +600,18 @@ function shopAction(i) {
     g.countShown = -1
     g.phaseT = 0
     input.clearEdges()
+    return
+  }
+  if (i < 3) {
+    const c = n.offer[i]
+    if (c && n.install(c.id)) {
+      g.score.window = COMBO_WINDOW + n.mods.comboBonus
+      audio.event('install')
+      hud.toast(c.name.toUpperCase(), 'INSTALLED')
+      // installed: the next press jacks back in unless you shop on
+      g.shopSel = SHOP_LEAVE
+    } else audio.event('deny')
+    renderShop()
     return
   }
   const ok = i === 3 ? n.repair() : n.reroll()
@@ -640,10 +659,10 @@ function startRespawn() {
   if (g.kind !== 'trial') {
     if (g.score.bail() === 'bail') hud.comboResult('bail', g.score.log.at(-1).points)
   }
-  if (g.kind === 'endless') g.lives--
+  if (g.kind === 'endless') { g.lives--; g.cleanLeg = false }
   if (g.heist) {
-    g.heist.stats.falls++
-    g.lives = g.heist.hurt()
+    if (g.heist.fall()) hud.toast('SECOND WIND', 'NO INTEGRITY LOST')
+    g.lives = g.heist.integrity
   }
 }
 
@@ -669,7 +688,12 @@ function passCheckpoint(i) {
   }
   audio.event('checkpoint')
   if (g.kind !== 'trial') {
-    hud.toast('CHECKPOINT')
+    // Endless: a whole leg without a fall wins a life back
+    if (g.cleanLeg && g.lives < RUN.LIVES) {
+      g.lives++
+      hud.toast('CLEAN LEG', '+1 LIFE')
+    } else hud.toast('CHECKPOINT')
+    g.cleanLeg = true
     return
   }
   g.splits.push(g.clock)
@@ -840,13 +864,20 @@ const COUNT = ['3', '2', '1', 'GO']
 
 let last = performance.now()
 let time = 0
+// what the view hasn't been shown yet: frames can pass without a redraw
+// (a rested screen, or every other frame on a fast display)
+const pendingDraw = { raw: 0, dt: 0, since: 0, frames: 0, rested: 0 }
+// behind a results or street-doc card the city only needs to tick over
+const REST_INTERVAL = 1 / 20
 
 function frame(now) {
   const workStart = performance.now()
   requestAnimationFrame(frame)
   const raw = Math.min(0.1, (now - last) / 1000)
   last = now
-  if (artLabOpen || document.hidden) { frameMeter.reset(); return }
+  if (artLabOpen || document.hidden) { frameMeter.reset(); governor.reset(); return }
+  const interval = now - (frame.prev ?? now)
+  frame.prev = now
   time += raw
   input.pollGamepad()
   if (g.mode === 'title' && input.takeAny()) start(g.sel)
@@ -916,7 +947,9 @@ function frame(now) {
     }
     if (g.recorder) g.recorder.sample(g.clock, cur)
   }
-  if (g.mode !== 'paused') g.level.prune(cur.x - 90)
+  // Heist puts you back on the roof you fell from; everywhere else a fall
+  // returns to the last checkpoint, so the city behind it has to stay.
+  if (g.mode !== 'paused') g.level.pruneBehind(cur.x, !g.heist && g.mode !== 'title')
 
   const alpha = g.mode === 'run' || g.mode === 'title' || g.mode === 'finish' ? g.acc / PHYS.FIXED_DT : 1
   const distance = Math.max(0, cur.x)
@@ -927,8 +960,24 @@ function frame(now) {
   g.fade = Math.max(0, g.fade - raw * 2.5)
   const ghost = g.ghost && (g.mode === 'run' || g.mode === 'respawn' || g.mode === 'finish') ? g.ghost.at(g.clock) : null
 
-  view.frame({
-    raw, dt, time, mode: g.mode === 'countdown' || g.mode === 'shop' ? 'run' : g.mode === 'flatline' ? 'paused' : g.mode, p: cur, level: g.level, distance, paletteD,
+  // Decide whether this display frame is drawn. A paused game redraws only
+  // when something changed; a results or street-doc screen ticks over at
+  // 20 fps; on a fast display the governor may halve the rate.
+  const draw = pendingDraw
+  draw.raw += raw
+  draw.dt += dt
+  draw.since += raw
+  draw.frames++
+  const resting = g.mode === 'over' || g.mode === 'shop'
+  let drew = true
+  if (g.mode === 'paused') drew = draw.rested++ < 2 || !view.settled
+  else {
+    draw.rested = 0
+    if (resting) drew = draw.since >= REST_INTERVAL || view.stale
+    else if (governor.stride > 1) drew = draw.frames >= governor.stride || view.stale
+  }
+  if (drew) view.frame({
+    raw: draw.raw, dt: draw.dt, time, mode: g.mode === 'countdown' || g.mode === 'shop' ? 'run' : g.mode === 'flatline' ? 'paused' : g.mode, p: cur, level: g.level, distance, paletteD,
     trace: g.heist && g.mode === 'run' ? g.heist.trace : 0,
     rx: g.prevX + (cur.x - g.prevX) * alpha,
     ry: g.prevY + (cur.y - g.prevY) * alpha,
@@ -938,6 +987,7 @@ function frame(now) {
     focusVis: g.focusVis, flash: g.flash, fade: g.fade,
     landCue: g.mode === 'run' ? landCue(cur) : null,
   })
+  if (drew) draw.raw = draw.dt = draw.since = draw.frames = 0
 
   // the street doc opens over the HUD, so it keeps updating behind it
   if (['run', 'respawn', 'countdown', 'finish', 'flatline', 'shop'].includes(g.mode)) {
@@ -976,7 +1026,15 @@ function frame(now) {
     focus: g.focusVis,
     playing: g.mode === 'run',
   })
-  frameMeter.sample(now, performance.now() - workStart)
+  const work = performance.now() - workStart
+  frameMeter.sample(now, work)
+  // judge only frames of actual play: menus and rested screens say nothing
+  if (g.mode === 'run' || g.mode === 'title') {
+    if (governor.sample(interval, work, drew)) {
+      view.quality = governor.level
+      frameMeter.note = governor.steps ? `${QUALITY_NAMES[governor.level]}${governor.stride > 1 ? ' ½' : ''}` : ''
+    }
+  } else governor.reset()
 }
 
 // The HUD's second line, rebuilt only when what it shows changes:
@@ -1006,4 +1064,4 @@ toTitle()
 installOffline()
 const appUpdates = installAppUpdates({ canShow: () => !artLabOpen && ['title', 'paused', 'over'].includes(g.mode) })
 requestAnimationFrame(frame)
-if (import.meta.env.DEV) window.__game = { g, view, start, newRun, landCue, frameMeter }
+if (import.meta.env.DEV) window.__game = { g, view, start, newRun, landCue, frameMeter, governor }

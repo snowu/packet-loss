@@ -29,6 +29,15 @@ export const CHROME = [
     desc: 'Drones spot you for half the trace.' },
   { id: 'siphon', short: 'SIPHON', name: 'Data Siphon', maker: 'ZEN 24', tag: 'DECK', max: 2,
     desc: 'Shards are worth double and pull in from further away.' },
+  { id: 'adrenal', short: 'ADRENAL', name: 'Adrenal Pump', maker: 'VOLT', tag: 'NERVOUS', max: 2,
+    desc: 'Every drone takedown kicks you +5 km/h and charges focus.' },
+  { id: 'secondwind', short: 'WIND', name: 'Second Wind', maker: 'HELIX', tag: 'SKELETON', rare: true, max: 1,
+    desc: 'The first fall in each sector costs no integrity.' },
+  // deals: more of one thing for less of another
+  { id: 'hotwire', short: 'HOTWIRE', name: 'Hotwired Deck', maker: 'ORBIT', tag: 'DECK', deal: true, max: 1,
+    desc: 'Shards are worth triple. Trace builds 30% faster.' },
+  { id: 'overdrive', short: 'OVERDRV', name: 'Overdrive Core', maker: 'PULSE', tag: 'HEART', deal: true, rare: true, max: 1,
+    desc: '+7 km/h top speed and clean moves jam twice the trace. −1 max integrity.' },
 ]
 
 const BY_ID = Object.fromEntries(CHROME.map((c) => [c.id, c]))
@@ -58,8 +67,8 @@ export function chromeEffects(owned) {
   const n = (id) => countOf(owned, id)
   const phys = {}
   if (n('tendons')) phys.AIR_JUMPS = (v) => v + n('tendons')
-  if (n('calves')) {
-    phys.SPEED_MAX = (v) => v + 1.1 * n('calves')
+  if (n('calves') || n('overdrive')) {
+    phys.SPEED_MAX = (v) => v + 1.1 * n('calves') + 1.9 * n('overdrive')
     phys.ACCEL = (v) => v * (1 + 0.25 * n('calves'))
   }
   if (n('pneumatic')) phys.JUMP_V = (v) => v * (1 + 0.03 * n('pneumatic'))
@@ -76,13 +85,17 @@ export function chromeEffects(owned) {
     focusScale: n('dilator') ? 0.25 : null,
     focusDrain: n('dilator') ? 0.6 : 1,
     comboBonus: 1 * n('synapse'),
-    maxIntegrity: n('plating'),
+    maxIntegrity: n('plating') - n('overdrive'),
     zapKeepsCombo: n('insulated') > 0,
     zapTrace: n('insulated') ? 0.5 : 1,
-    traceRate: Math.pow(0.8, n('ghost')),
+    traceRate: Math.pow(0.8, n('ghost')) * (n('hotwire') ? 1.3 : 1),
     spotTrace: Math.pow(0.5, n('jammer')),
-    shardValue: 1 + n('siphon'),
+    shardValue: (1 + n('siphon')) * (n('hotwire') ? 3 : 1),
     magnet: 0.6 * n('siphon'),
+    moveJam: n('overdrive') ? 2 : 1,
+    takedownSpeed: 1.4 * n('adrenal'),
+    takedownFocus: 0.15 * n('adrenal'),
+    freeFalls: n('secondwind'),
   }
   return { phys, run }
 }
