@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RunGait, RUN_STRIDE, STANCE, CONTACT_X, RECOVERY_KEYS, SHOE, runFrame, runPose, shinFootAngle } from '../src/pixel/runGait.js'
-import { armPose, shoulderAt, TORSO } from '../src/pixel/runRig.js'
+import { armPose, shoulderAt, TORSO, ARM, hairOffset } from '../src/pixel/runRig.js'
 
 const runner = speed => ({ state: 'run', speed })
 
@@ -110,14 +110,31 @@ describe('distance-driven run gait', () => {
       expect((dx * Math.cos(pose.lean) + dy * Math.sin(pose.lean)) / (TORSO.height * aspect) + TORSO.hip[0]).toBeCloseTo(TORSO.shoulder[0], 10)
       expect((-dx * Math.sin(pose.lean) + dy * Math.cos(pose.lean)) / TORSO.height + TORSO.hip[1]).toBeCloseTo(TORSO.shoulder[1], 10)
       for (const angle of [pose.arm, -pose.arm]) {
-        const { elbow, wrist } = armPose(shoulder, angle)
-        expect(Math.hypot(elbow[0] - shoulder[0], elbow[1] - shoulder[1])).toBeCloseTo(5.7, 10)
-        expect(Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1])).toBeCloseTo(4.4, 10)
+        const { elbow, wrist, knuckles } = armPose(shoulder, angle)
+        expect(Math.hypot(elbow[0] - shoulder[0], elbow[1] - shoulder[1])).toBeCloseTo(5.9, 10)
+        expect(Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1])).toBeCloseTo(4.9, 10)
+        expect(Math.hypot(knuckles[0] - wrist[0], knuckles[1] - wrist[1])).toBeCloseTo(ARM.hand, 10)
+        // Wrist and fist continue the forearm rather than kinking sideways.
+        expect((knuckles[0] - wrist[0]) * (wrist[1] - elbow[1]) - (knuckles[1] - wrist[1]) * (wrist[0] - elbow[0])).toBeCloseTo(0, 10)
         expect(wrist[0]).toBeGreaterThan(elbow[0])
         const flex = Math.atan2(wrist[0] - elbow[0], wrist[1] - elbow[1]) - angle
         expect(flex).toBeGreaterThan(1.4)
         expect(flex).toBeLessThan(1.9)
       }
+    }
+  })
+
+  it('keeps the hair tie fixed while the tips move and loops without a seam', () => {
+    const tips = []
+    for (let i = 0; i < 64; i++) {
+      expect(hairOffset(i / 64, 0)).toBe(0)
+      tips.push(hairOffset(i / 64, 1))
+    }
+    expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(1.5)
+    for (const distance of [0, 0.25, 0.5, 0.75, 1]) {
+      expect(hairOffset(0, distance)).toBeCloseTo(hairOffset(1, distance), 10)
+      expect(Math.abs(hairOffset(1 - 1e-6, distance) - hairOffset(1e-6, distance))).toBeLessThan(0.0001)
+      expect(Math.abs(hairOffset(0.3, distance))).toBeLessThanOrEqual(1.35)
     }
   })
 

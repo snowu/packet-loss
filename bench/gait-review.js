@@ -65,6 +65,29 @@ try {
   })
   assert.ok(report.sounds > 20); assert.equal(report.sounds, report.matchedDraws)
   assert.ok(report.focusSteps > 0); assert.equal(report.pending, null)
+  const hairLayers = await page.evaluate(async () => {
+    const { splitHair } = await import('/packet-loss/src/pixel/runRig.js')
+    return Object.entries(window.__game.view.art.rigs).map(([outfit, parts]) => {
+      const image = parts[0], { body, tail } = splitHair(image)
+      const cv = document.createElement('canvas'); cv.width = image.width; cv.height = image.height
+      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(image, 0, 0)
+      const original = ctx.getImageData(0, 0, cv.width, cv.height).data
+      const b = body.getContext('2d').getImageData(0, 0, cv.width, cv.height).data
+      const t = tail.getContext('2d').getImageData(0, 0, cv.width, cv.height).data
+      let moving = 0
+      for (let i = 0; i < original.length; i += 4) {
+        if (b[i + 3] + t[i + 3] !== original[i + 3]) throw new Error(`${outfit}: hair split loses or duplicates pixels`)
+        if (t[i + 3] > 32) {
+          moving++
+          if ((i / 4) % cv.width > cv.width * 0.66) throw new Error(`${outfit}: face entered the moving hair layer`)
+          if (outfit === 'windbreaker' && t[i + 1] > 50 && t[i + 2] > 50 && t[i] < t[i + 1] * 0.7 && t[i + 2] > t[i] * 1.3) throw new Error('Scarf entered the ponytail layer')
+        }
+      }
+      if (moving < 1000) throw new Error(`${outfit}: missing ponytail`)
+      return { outfit, movingPixels: moving }
+    })
+  })
+  console.log('Hair layer checks:', JSON.stringify(hairLayers))
   const sheet = await page.evaluate(async () => {
     const v = window.__game.view
     const cv = document.createElement('canvas'); cv.width = 1440; cv.height = 780
@@ -101,7 +124,7 @@ try {
         const toe = [l.ankle[0] + x * Math.cos(l.tilt) - y * Math.sin(l.tilt), l.ankle[1] + x * Math.sin(l.tilt) + y * Math.cos(l.tilt)]
         return [l.hip, l.knee, l.ankle, toe]
       }).concat([-pose.arm, pose.arm].map(angle => {
-        const a = armPose(shoulder, angle); return [a.shoulder, a.elbow, a.wrist]
+        const a = armPose(shoulder, angle); return [a.shoulder, a.elbow, a.wrist, a.knuckles]
       })).map(chain => chain.map(p => p.map((x, i) => (x + RUN_ORIGIN[i]) * 2)))
     }))
     return { atlas: cv.toDataURL(), skeletons, outfits }

@@ -44,6 +44,18 @@ Reduced stance compression and earlier heel roll keep the planted ankle from
 over-flexing too. The skeleton overlay includes the toe, so foot orientation
 can be inspected alongside the knee and ankle.
 
+Upper arms and forearms use registered elbow/wrist pivots with slightly longer
+proportions. The cuff and fist are drawn separately at a consistent size, so
+the thumb and knuckles do not shrink with forearm scaling. The wrist-to-knuckle
+axis continues the forearm and is included in the skeleton review.
+
+The existing torso artwork is split at startup into a fixed head/body and a
+moving ponytail. A connected silhouette mask excludes detached scarf pieces
+and assigns every source pixel to one layer. The ponytail is deformed in strips
+with a delayed wave toward the tips; its tie stays fixed, and the wave loops
+with the distance-driven stride. Hair and hands are included in the same 64
+cached frames, preserving one image draw per runner during gameplay.
+
 ## Review
 
 ![Eight phases of all three outfits](screenshots/gait/run-cycle.png)
@@ -61,7 +73,7 @@ shows both cycles at the same phase, with optional skeleton overlays.
 
 `node bench/gait-review.js` checks the actual game's audio callbacks against its
 rendered gait across all three outfits, focus and pause, and writes the stride
-sheet and animated review. `--compare=72fd084` also generates the synchronized
+sheet and animated review. `--compare=e06fd33` also generates the synchronized
 before/after review and sheet from that commit's cached review frames.
 `--record` also records ten seconds of actual gameplay with Web Audio
 mixed into the canvas recording (WebM). `tests/runGait.test.js` checks speed/draw-rate independence, contact
