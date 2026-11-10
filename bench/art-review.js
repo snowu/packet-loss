@@ -2,8 +2,9 @@
 // node bench/art-review.js [--root=../packet-loss-before] [--tag=before]
 import { createServer } from 'vite'
 import { chromium } from 'playwright'
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { readFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { setTimeout as pause } from 'node:timers/promises'
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => a.replace(/^--/, '').split('=')))
 const root = resolve(args.root || '.')
@@ -25,8 +26,15 @@ try {
     await page.route(/https:\/\/fonts\./, r => r.abort())
     await page.addInitScript(`${pin}; pinWorld()`)
     await page.goto(`${server.resolvedUrls.local[0]}?seed=12345&quality=0`)
-    await page.waitForFunction(() => !!window.__game, null, { polling: 50 })
-    const data = await page.evaluate(async ({ district, rain }) => {
+    // The page's timers are pinned, so poll from Node (as bench.js does).
+    const deadline = Date.now() + 30000
+    let ready = false
+    while (!ready && Date.now() < deadline) {
+      ready = await page.evaluate(() => !!window.__game)
+      if (!ready) await pause(20)
+    }
+    if (!ready) throw new Error(`${name}: game startup failed: ${errors.join('; ') || 'timeout'}`)
+    await page.evaluate(async ({ district, rain }) => {
       const { pinPalette } = await import('/packet-loss/src/pixel/palette.js')
       const { Bot } = await import('/packet-loss/src/sim/bot.js')
       pinPalette(district)
@@ -37,11 +45,10 @@ try {
       G.view.baker.worker?.terminate(); G.view.baker.worker = null
       Object.assign(G.view.weather, { ready: true, rain, wet: rain, target: rain, clock: 1e9 })
       for (let i = 0; i < 420; i++) window.__tick()
-      return G.view.canvas.toDataURL('image/png').split(',')[1]
     }, { district, rain })
     if (errors.length) throw new Error(errors.join('\n'))
-    writeFileSync(resolve(output, `${tag}-${name}.png`), Buffer.from(data, 'base64'))
-    console.log(`${tag}-${name}: actual game canvas captured`)
+    await page.screenshot({ path: resolve(output, `${tag}-${name}.png`), animations: 'disabled' })
+    console.log(`${tag}-${name}: actual game viewport captured`)
     await page.close()
   }
 } finally { await browser.close(); await server.close() }

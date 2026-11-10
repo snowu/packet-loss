@@ -24,17 +24,29 @@ neighbour. They are sprite studies, not gameplay screenshots.
 Regenerate with `node scripts/art-sheet.mjs` (pass a checkout path and output
 filename to capture another revision).
 
+## Gameplay screenshots
+
+The same seeded Heist frame (420 ticks) on current master and the proposed
+branch. CSS transitions are finished for capture; simulation time and weather
+are fixed. Fonts are blocked for consistent fallback typography.
+
+| Scene | Before | Proposed |
+| --- | --- | --- |
+| Kowloon dry | ![Before dry](screenshots/courier-pass/before-kowloon.png) | ![After dry](screenshots/courier-pass/after-kowloon.png) |
+| Kowloon wet | ![Before wet](screenshots/courier-pass/before-kowloon-wet.png) | ![After wet](screenshots/courier-pass/after-kowloon-wet.png) |
+| Phone portrait | ![Before phone](screenshots/courier-pass/before-phone.png) | ![After phone](screenshots/courier-pass/after-phone.png) |
+
 ## Validation
 
 - `npm test`: 19 files, 172 tests passed.
 - `npm run build`: passed.
-- Local Chromium cannot launch: the execution environment denies the Unix
-  socket required by Chromium's process singleton. Browser render checks and
-  render-budget checks have not been completed locally.
+- `npm run test:render`: passed with Playwright's headless shell (the system
+  Chromium executable requires a Unix socket unavailable in this environment).
 - The art-review CI job runs unit tests, builds, and captures the same seeded
   Heist frame on the PR base and proposed branch in dry/wet Kowloon and phone
   portrait. Download its `art-review` artifact to inspect gameplay frames.
   Run `node bench/art-review.js` to reproduce; `CHROMIUM_PATH` can select an
   installed browser. Existing render-budget and long-run CI remain in place.
 
-Gameplay screenshots and performance checks must be reviewed before merging.
+CI uses Ubuntu 24.04, since the pinned Playwright version does not support the
+Ubuntu 26.04 image now selected by `ubuntu-latest`.
