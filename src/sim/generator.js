@@ -12,6 +12,7 @@
 
 import { PHYS, WORLD, HEIST } from './config.js'
 import { createRng } from './rng.js'
+import { STANDARD } from './routes.js'
 
 // Bump when the same seed starts producing a different course: records and
 // ghosts saved against the old layout no longer line up with it.
@@ -129,7 +130,10 @@ export class CourseGenerator {
   // options.difficulty: { start, ramp } — difficulty grows from start to 1 over ramp meters
   // options.heist: add data shards, laser grids and drones (from their own rng,
   //   so the buildings are identical to the same seed without them)
-  constructor(seed, { tutorial = true, length = Infinity, checkpointEvery = 250, difficulty = null, heist = false } = {}) {
+  // options.routeFor: (sector) => route for that sector's security, or
+  //   nothing if it isn't chosen yet: those roofs keep a `heistPlan` and get
+  //   their security later, from secureChunk
+  constructor(seed, { tutorial = true, length = Infinity, checkpointEvery = 250, difficulty = null, heist = false, routeFor = null } = {}) {
     this.seed = seed >>> 0
     this.rng = createRng(this.seed)
     this.index = 0
@@ -146,6 +150,7 @@ export class CourseGenerator {
     this.finished = false
     this.difficulty = difficulty
     this.heist = heist
+    this.routeFor = routeFor
     // its own rng, so drawing the skyline doesn't shift the course's rolls
     this.skyline = createSkyline(createRng(this.seed ^ 0x5c71e))
     this.plainRun = 0
@@ -195,6 +200,11 @@ export class CourseGenerator {
       lasers: [],
       drones: [],
       gap: null,
+      // which stretch between checkpoints this roof belongs to. The roof a
+      // checkpoint stands on counts with the stretch before it: it is on
+      // screen while the next one's route is still being chosen.
+      sector: this.checkpointCount,
+      heistPlan: null,
       xEnd: 0,
       span: [x0, x1],
       checkpoint: null,
@@ -219,7 +229,11 @@ export class CourseGenerator {
     if (!finish) this.placeObstacles(chunk, obstacleStart, obstacleEnd, d, tutorial)
     this.placeDecor(chunk)
     if (!finish && !tutorial) placeFences(chunk, d, obstacleStart)
-    if (this.heist && id > 0 && !finish) placeHeist(chunk, gap, d, obstacleStart)
+    if (this.heist && id > 0 && !finish) {
+      chunk.heistPlan = { d, entry: obstacleStart }
+      const route = this.routeFor ? this.routeFor(chunk.sector) : STANDARD
+      if (route) secureChunk(chunk, route)
+    }
     if (tutorial?.hints.gap) chunk.hints.push({ x: x1 - 14, key: tutorial.hints.gap })
 
     chunk.xEnd = gap.nextX0
@@ -491,7 +505,16 @@ function takedownCarry() {
   return HEIST.DRONE_W / 2 + t * PHYS.SPEED_MAX + ARC_READ * PHYS.SPEED_MAX
 }
 
-function placeHeist(chunk, gap, d, entry) {
+// Lay a route's security over a roof that is still waiting for it.
+export function secureChunk(chunk, route) {
+  if (!chunk.heistPlan) return false
+  const { d, entry } = chunk.heistPlan
+  chunk.heistPlan = null
+  placeHeist(chunk, chunk.gap, d, entry, route)
+  return true
+}
+
+function placeHeist(chunk, gap, d, entry, route = STANDARD) {
   const rng = createRng(chunk.seed ^ SHARD_RING)
   const { x0, x1, roof } = chunk
   let n = 0
@@ -525,8 +548,8 @@ function placeHeist(chunk, gap, d, entry) {
     return at
   }
 
-  // gap lines
-  switch (gap.type) {
+  // gap lines (routes poor in shards keep only some of them)
+  if (route.shards >= 1 || rng.chance(route.shards)) switch (gap.type) {
     case 'jump': {
       for (const u of [0.2, 0.5, 0.8]) {
         const base = roof + (gap.dh < 0 ? gap.dh * u * u : gap.dh * u)
@@ -554,44 +577,70 @@ function placeHeist(chunk, gap, d, entry) {
       break
   }
 
-  // laser grids: low ones are jumped, high ones are slid under. Some take
-  // the place of a vent (also a jump: vaults need one) or a pipe (a slide), so
-  // the spacing the obstacle pass designed for reaction time still holds.
-  const swap = 0.2 + 0.35 * d
-  for (const s of blocks) {
-    if ((s.sub !== 'vent' && s.sub !== 'beam') || !rng.chance(swap)) continue
-    const low = s.sub === 'vent'
-    const len = Math.max(low ? 1.8 : 1.4, s.x1 - s.x0 + 0.6)
-    chunk.solids.splice(chunk.solids.indexOf(s), 1)
-    addLaser(s.x0 - 0.3, len, low)
-  }
-  // drones hover just above head height: kick them out of the air, or get
-  // spotted. One goes on clear roof if there's room, or else takes the place
-  // of an obstacle, whose spacing already leaves time to see it coming.
-  if (rng.chance(0.65 + 0.3 * d)) {
-    const limit = gap.runwayStart - takedownCarry()
-    const drone = (x) => chunk.drones.push({ id: `${chunk.id}:D`, x: round(x), y: round(roof + 2.75), down: false, spotted: false, passed: false })
-    const at = take(6, limit + 3)
-    if (at !== null) drone(at + 3)
-    else {
-      const spots = chunk.solids.filter((s) => (s.sub === 'beam' || s.sub === 'vent') && (s.x0 + s.x1) / 2 <= limit)
-      if (spots.length) {
-        const s = rng.pick(spots)
-        chunk.solids.splice(chunk.solids.indexOf(s), 1)
-        drone((s.x0 + s.x1) / 2)
-      }
+  const swapLasers = () => {
+    // laser grids: low ones are jumped, high ones are slid under. Some take
+    // the place of a vent (also a jump: vaults need one) or a pipe (a slide), so
+    // the spacing the obstacle pass designed for reaction time still holds.
+    const swap = Math.min(0.95, (0.2 + 0.35 * d) * route.laser)
+    for (const s of blocks) {
+      if ((s.sub !== 'vent' && s.sub !== 'beam') || !rng.chance(swap)) continue
+      if (!chunk.solids.includes(s)) continue   // a drone already took its place
+      const low = s.sub === 'vent'
+      const len = Math.max(low ? 1.8 : 1.4, s.x1 - s.x0 + 0.6)
+      chunk.solids.splice(chunk.solids.indexOf(s), 1)
+      addLaser(s.x0 - 0.3, len, low)
     }
   }
+  const postDrones = () => {
+    // drones hover just above head height: kick them out of the air, or get
+    // spotted. One goes on clear roof if there's room, or else takes the place
+    // of an obstacle, whose spacing already leaves time to see it coming.
+    if (rng.chance((0.65 + 0.3 * d) * route.drone)) {
+      const limit = gap.runwayStart - takedownCarry()
+      const drone = (x) => chunk.drones.push({ id: `${chunk.id}:D${chunk.drones.length || ''}`, x: round(x), y: round(roof + 2.75), down: false, spotted: false, passed: false })
+      const at = take(6, limit + 3)
+      if (at !== null) {
+        drone(at + 3)
+        // routes thick with drones post a second one where there's clear roof
+        if (route.drone > 1 && rng.chance(route.drone - 1)) {
+          const more = take(6, limit + 3)
+          if (more !== null) drone(more + 3)
+        }
+      } else {
+        const spots = chunk.solids.filter((s) => (s.sub === 'beam' || s.sub === 'vent') && (s.x0 + s.x1) / 2 <= limit)
+        if (spots.length) {
+          const s = rng.pick(spots)
+          chunk.solids.splice(chunk.solids.indexOf(s), 1)
+          drone((s.x0 + s.x1) / 2)
+        }
+      }
+    }
 
-  if (rng.chance(0.15 + 0.3 * d)) {
+  }
+  // Obstacles are the only cover on a crowded roof, and whichever goes first
+  // takes them: lasers on most routes, drones on the ones that are about them.
+  if (route.drone > route.laser) { postDrones(); swapLasers() } else { swapLasers(); postDrones() }
+
+  if (rng.chance((0.15 + 0.3 * d) * route.laser)) {
     const low = rng.chance(0.5)
     const len = low ? rng.range(1.8, 3.2) : rng.range(1.4, 2.8)
     const at = take(len + 8)
     if (at !== null) addLaser(at + 5, len, low)
   }
 
+  // routes rich in shards also hang one on every obstacle left standing:
+  // over a vent where a vault carries you, under a pipe where a slide does
+  if (route.shards > 1) {
+    for (const sd of chunk.solids) {
+      if (sd.sub === 'vent') shard((sd.x0 + sd.x1) / 2, sd.y1 + 0.9)
+      else if (sd.sub === 'beam') shard((sd.x0 + sd.x1) / 2, roof + 0.45)
+    }
+  }
+
   // a line of shards along the roof: low ones are free, high ones need a jump
-  if (rng.chance(0.65)) {
+  for (let line = 0; line < 2; line++) {
+    // a second line only turns up on routes rich in shards
+    if (!rng.chance(0.65 * route.shards - line)) continue
     const count = rng.int(3, 5)
     const at = take(count * 1.6 + 1)
     if (at !== null) {

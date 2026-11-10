@@ -134,6 +134,16 @@ export const HEIST = {
   CLEAN_BONUS: 40,       // no laser tripped, never spotted or burned, no fall
   FAST_BONUS: 25,        // through the sector at SECTOR_PAR_SPEED or better
   SECTOR_PAR_SPEED: 13.5,
+  CONTRACT_PAY: 50,
+  // exfil: over the last stretch before the finish the trace climbs hard,
+  // and only moves hold it back
+  EXFIL_LEN: 170,
+  EXFIL_TRACE: 1.4,
+  // threat levels: each extraction unlocks the next
+  THREAT_MAX: 5,
+  THREAT_TRACE: 0.08,     // trace builds this much faster per level
+  THREAT_SECURITY: 0.1,   // lasers and drones this much denser per level
+  THREAT_SCORE: 0.25,     // and the run scores this much more
 }
 
 export const FOCUS = {

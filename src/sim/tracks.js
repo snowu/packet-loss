@@ -15,6 +15,13 @@ export function dailyTrack(date = new Date()) {
   return { id: `daily-${key}`, name: 'Daily', seed: h >>> 0, length: 1000, checkpointEvery: 200, difficulty: { start: 0.4, ramp: 2400 }, medals: null, daily: key }
 }
 
+// The daily heist: one seed a day, so the city, the street doc's offers and
+// the ways on are the same for everyone.
+export function dailyHeist(date = new Date()) {
+  const daily = dailyTrack(date)
+  return { id: `heist-${daily.daily}`, seed: (daily.seed ^ 0x4e157) >>> 0, daily: daily.daily }
+}
+
 export function levelOptions(track) {
   return { tutorial: false, length: track.length, checkpointEvery: track.checkpointEvery, difficulty: track.difficulty }
 }

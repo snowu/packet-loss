@@ -34,6 +34,7 @@
         <div class="trace-wrap" id="trace-wrap">
           <div class="trace-label"><span>TRACE</span><b id="trace-val">0%</b></div>
           <div class="trace"><i id="trace-fill"></i></div>
+          <div class="contract" id="contract"></div>
         </div>
       </div>
       <div class="hud-tr">
@@ -69,9 +70,11 @@
         <h1>PACKET<br /><em>LOSS</em></h1>
         <ul id="menu" class="menu"></ul>
         <div class="city-pick"><span>RUNNER</span><button id="runner-prev" aria-label="Previous runner">‹</button><em id="runner-name">COURIER</em><button id="runner-next" aria-label="Next runner">›</button></div>
+        <div class="unlock-note perk" id="runner-perk"></div>
         <div class="unlock-note" id="unlock-note"></div>
+        <div class="city-pick" id="threat-pick"><span>THREAT</span><button id="threat-prev" aria-label="Lower threat">‹</button><em id="threat-name">0</em><button id="threat-next" aria-label="Higher threat">›</button></div>
         <div class="city-pick"><span>CITY</span><button id="city-prev" aria-label="Previous city palette">‹</button><em id="city-name">DRIFT</em><button id="city-next" aria-label="Next city palette">›</button></div>
-        <div class="menu-help key-only"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> city · <kbd>Q</kbd><kbd>E</kbd> runner · <kbd>SPACE</kbd> run · <kbd>R</kbd> restart</div>
+        <div class="menu-help key-only"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> city · <kbd>Q</kbd><kbd>E</kbd> runner · <kbd>T</kbd> threat · <kbd>SPACE</kbd> run · <kbd>R</kbd> restart</div>
         <dl class="controls key-only">
           <dt><kbd>SPACE</kbd></dt><dd>Jump — hold for height, into walls to climb</dd>
           <dt><kbd>S</kbd></dt><dd>Slide — right on touchdown to chain it, before a big drop to roll</dd>
@@ -116,10 +119,14 @@
         <div class="actions shop-actions">
           <button id="btn-repair" class="action">REPAIR</button>
           <button id="btn-reroll" class="action">REROLL</button>
-          <button id="btn-jack" class="action primary">JACK IN</button>
+        </div>
+        <div class="shop-routes">
+          <span>WAY ON</span>
+          <button id="btn-route-a" class="route"></button>
+          <button id="btn-route-b" class="route"></button>
         </div>
         <div class="shop-owned" id="shop-owned"></div>
-        <div class="menu-help key-only"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>SPACE</kbd> install · buy · jack in</div>
+        <div class="menu-help key-only"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>SPACE</kbd> install · buy · take a way on</div>
       </div>
     </div>
 
