@@ -9,6 +9,7 @@ import { TRACKS, dailyTrack, dailyHeist, levelOptions } from './sim/tracks.js'
 import { COURSE_VERSION } from './sim/generator.js'
 import { HeistState, heistOptions, LOADOUTS, threatScore } from './sim/heist.js'
 import { chromeById, SETS, SET_SIZE, makerCount, activeSets } from './sim/chrome.js'
+import { UNLOCKS as STOCK, repFor } from './sim/unlocks.js'
 import { Input } from './input.js'
 import { Audio } from './audio.js'
 import { Hud, formatTime, medalFor } from './ui/hud.js'
@@ -186,6 +187,38 @@ const endlessBest = () => Number(store.get('fil.best.endless', 0)) || 0
 const heistKey = (daily) => (daily ? `fil.best.${dailyHeist().id}` : 'fil.best.heist')
 const heistBest = (daily = false) => store.json(heistKey(daily))
 
+// Rep and the fixer: every heist pays rep, and rep buys things that turn up
+// in later heists.
+const repTotal = () => Number(store.get('fil.rep', 0)) || 0
+const unlocks = () => store.json('fil.unlocks') ?? []
+function showRep() {
+  document.getElementById('rep-total').textContent = repTotal().toLocaleString()
+}
+function renderFixer() {
+  const have = unlocks(), rep = repTotal()
+  hud.fixer(STOCK.map((u) => ({ ...u, owned: have.includes(u.id), ok: rep >= u.cost })), rep, g.fixerSel, buyUnlock)
+}
+function openFixer(on) {
+  g.fixerOpen = on
+  g.fixerSel = 0
+  hud.showTitle(!on)
+  hud.showFixer(on)
+  input.clearEdges()
+  if (on) renderFixer()
+  else showRep()
+}
+function buyUnlock(i) {
+  g.fixerSel = i
+  const u = STOCK[i], have = unlocks()
+  if (have.includes(u.id) || repTotal() < u.cost) audio.event('deny')
+  else {
+    store.set('fil.rep', String(repTotal() - u.cost))
+    store.set('fil.unlocks', JSON.stringify([...have, u.id]))
+    audio.event('install')
+  }
+  renderFixer()
+}
+
 // Threat: every extraction unlocks the next level, hotter and worth more.
 const threatUnlocked = () => Math.min(HEIST.THREAT_MAX, Number(store.get('fil.heist.threat', 0)) || 0)
 const threatName = document.getElementById('threat-name')
@@ -264,6 +297,7 @@ function stepRunner(d) {
 }
 setRunner(store.get('fil.runner', RUNNERS[0]).split(':')[0])
 setThreat(Number(store.get('fil.heist.threatSel', 0)) || 0)
+showRep()
 
 function renderMenu() {
   hud.menu(menuItems(), g.sel, (i) => start(i))
@@ -292,6 +326,7 @@ function endHeistState() {
 }
 
 function toTitle() {
+  if (g.fixerOpen) openFixer(false)
   endHeistState()
   hud.showShop(false)
   buildWorld(new Level(DEMO_SEED), true)
@@ -332,7 +367,8 @@ function newRun() {
   g.cpNext = 0
   g.splits = []
   g.hintsShown.clear()
-  g.heist = g.kind === 'heist' ? new HeistState(seed, { threat, loadout: g.runner }) : null
+  // the daily is the same for everyone: nothing from the fixer comes along
+  g.heist = g.kind === 'heist' ? new HeistState(seed, { threat, loadout: g.runner, unlocked: g.daily ? [] : unlocks() }) : null
   g.score = new ScoreKeeper()
   g.score.teleport(g.player.x)
   g.lives = RUN.LIVES
@@ -426,6 +462,11 @@ function toggleMute() {
 const playing = () => ['countdown', 'run', 'respawn', 'finish', 'paused', 'over', 'shop', 'flatline'].includes(g.mode)
 
 input.on('nav', (d) => {
+  if (g.fixerOpen) {
+    g.fixerSel = (g.fixerSel + d + STOCK.length) % STOCK.length
+    renderFixer()
+    return
+  }
   if (g.mode === 'shop') {
     // step over slots whose chrome is already installed
     do g.shopSel = (g.shopSel + d + SHOP_ITEMS) % SHOP_ITEMS
@@ -438,21 +479,29 @@ input.on('nav', (d) => {
   renderMenu()
 })
 input.on('runner', (d) => {
-  if (g.mode === 'title') stepRunner(d)
+  if (g.mode === 'title' && !g.fixerOpen) stepRunner(d)
 })
 input.on('side', (d) => {
-  if (g.mode === 'title') setCity(g.city + d, true)
+  if (g.fixerOpen) {
+    g.fixerSel = (g.fixerSel + d + STOCK.length) % STOCK.length
+    renderFixer()
+  } else if (g.mode === 'title') setCity(g.city + d, true)
 })
 input.on('threat', () => {
-  if (g.mode === 'title') stepThreat(1)
+  if (g.mode === 'title' && !g.fixerOpen) stepThreat(1)
+})
+input.on('fixer', () => {
+  if (g.mode === 'title') openFixer(!g.fixerOpen)
 })
 input.on('confirm', () => {
-  if (g.mode === 'shop') shopAction(g.shopSel)
+  if (g.fixerOpen) buyUnlock(g.fixerSel)
+  else if (g.mode === 'shop') shopAction(g.shopSel)
   else if (g.mode === 'title') start(g.sel)
   else if (g.mode === 'over' && performance.now() - g.overAt > 400) newRun()
 })
 input.on('enter', () => {
-  if (g.mode === 'shop') shopAction(g.shopSel)
+  if (g.fixerOpen) buyUnlock(g.fixerSel)
+  else if (g.mode === 'shop') shopAction(g.shopSel)
   else if (g.mode === 'title') start(g.sel)
   else if (g.mode === 'paused') { hud.showPaused(false); toMenu() }
   else if (g.mode === 'over') newRun()
@@ -463,7 +512,8 @@ input.on('restart', () => {
   newRun()
 })
 input.on('back', () => {
-  if (g.mode === 'paused') setPaused(false)
+  if (g.fixerOpen) openFixer(false)
+  else if (g.mode === 'paused') setPaused(false)
   else if (g.mode === 'over') toMenu()
   else setPaused(true)
 })
@@ -483,6 +533,8 @@ click('city-prev', (e) => { setCity(g.city - 1, true); e.currentTarget.blur() })
 click('city-next', (e) => { setCity(g.city + 1, true); e.currentTarget.blur() })
 click('runner-prev', (e) => { stepRunner(-1); e.currentTarget.blur() })
 click('runner-next', (e) => { stepRunner(1); e.currentTarget.blur() })
+click('btn-fixer', (e) => { openFixer(true); e.currentTarget.blur() })
+click('btn-fixer-close', () => openFixer(false))
 click('threat-prev', (e) => { stepThreat(-1); e.currentTarget.blur() })
 click('threat-next', (e) => { stepThreat(1); e.currentTarget.blur() })
 // Fullscreen: toggled from the title screen or the HUD. Landscape is locked
@@ -583,13 +635,17 @@ function heistEvent(e) {
       contractToast(e.failed)
       break
     case 'exfil':
-      hud.district('EXFIL · THEY KNOW WHERE YOU ARE GOING')
-      hud.toast('EXFIL', 'TRACE CLIMBING · KEEP MOVING')
+      hud.district('EXFIL · TRACE CLIMBING · KEEP MOVING')
       audio.event('spotted')
       view.glitch(0.5)
       break
     case 'shard':
       if (e.focus) g.focus = Math.min(1, g.focus + e.focus)
+      break
+    case 'short':
+      hud.toast('SHORTED OUT', `+¢${HEIST.SHORT_CREDS}`)
+      audio.event('buy')
+      view.burst?.(e.x, e.y, 10, { spread: 1.6, up: 1.4, color: [125, 248, 255], life: 0.4 })
       break
     case 'zap':
       hud.toast('LASER GRID', e.keepsCombo ? 'INSULATED' : 'ALARM TRIPPED')
@@ -617,8 +673,9 @@ function heistEvent(e) {
 
 // The street doc: slots 0-2 are the chrome on offer, then repair, reroll and
 // jacking back in.
-const SHOP_ITEMS = 7
-const SHOP_ROUTE = 5
+const SHOP_ITEMS = 8
+const SHOP_DEAL = 5
+const SHOP_ROUTE = 6
 
 function openShop() {
   const n = g.heist
@@ -648,6 +705,7 @@ function renderShop() {
       set: setProgress(n.owned, c),
     }),
     routes: n.routeOffer,
+    deal: { name: n.deal.name, text: n.deal.text, ok: n.canDeal, taken: n.deal.taken },
     sets: setsOf(n.owned),
     free: n.freePick,
     payout: g.payout,
@@ -691,6 +749,13 @@ function shopAction(i) {
     renderShop()
     return
   }
+  if (i === SHOP_DEAL) {
+    const got = n.takeDeal()
+    audio.event(got ? 'install' : 'deny')
+    if (got) hud.toast(n.deal.name, typeof got === 'string' ? got : 'DONE')
+    renderShop()
+    return
+  }
   const ok = i === 3 ? n.repair() : n.reroll()
   audio.event(ok ? 'buy' : 'deny')
   renderShop()
@@ -715,8 +780,11 @@ function endHeist(extracted) {
     store.set('fil.heist.threat', String(unlocked))
     setThreat(unlocked)
   }
+  const rep = repFor({ sector: extracted ? HEIST.SECTORS : n.sector, extracted, contracts: n.stats.contracts, threat: n.threat })
+  store.set('fil.rep', String(repTotal() + rep))
+  showRep()
   g.result = {
-    kind: 'heist', daily: g.daily, threat: n.threat, mult, unlocked, sets: setsOf(n.owned),
+    kind: 'heist', daily: g.daily, threat: n.threat, mult, unlocked, sets: setsOf(n.owned), rep, repTotal: repTotal(),
     extracted, score, bonus, best: Math.max(prev?.score ?? 0, score), newBest,
     sector, sectors: HEIST.SECTORS, creds: n.creds, stats: { ...n.stats }, chrome: n.owned.map(chromeById),
     topSpeed: g.topSpeed, bestCombo: g.score.bestCombo,
@@ -859,7 +927,10 @@ function stepPhysics(dt) {
     const control = g.bot ? g.bot.input(p) : g.mode === 'run' ? input.consume() : IDLE
     events.length = 0
     stepPlayer(p, control, PHYS.FIXED_DT, g.level, events)
-    if (g.heist && g.mode === 'run') g.heist.step(PHYS.FIXED_DT, p, g.level, events)
+    if (g.heist && g.mode === 'run') {
+      g.heist.cloaked = g.focusActive
+      g.heist.step(PHYS.FIXED_DT, p, g.level, events)
+    }
     for (const e of events) onEvent(e)
     if (g.mode !== 'run' && g.mode !== 'title' && g.mode !== 'finish') break
     // an uplink opens the street doc: stop simulating right there
@@ -968,7 +1039,7 @@ function frame(now) {
   frame.prev = now
   time += raw
   input.pollGamepad()
-  if (g.mode === 'title' && input.takeAny()) start(g.sel)
+  if (g.mode === 'title' && !g.fixerOpen && input.takeAny()) start(g.sel)
   else input.takeAny()
 
   const p = g.player
@@ -1023,6 +1094,10 @@ function frame(now) {
   }
 
   appUpdates.sync()
+  // things the heist state wants said
+  while (g.heist?.notices.length) {
+    if (g.heist.notices.shift() === 'deadman') { hud.toast('DEADMAN SWITCH', 'ONE MORE CHANCE'); g.flash = 0.3; g.lives = g.heist.integrity }
+  }
   const cur = g.player
   if (g.mode === 'run') {
     const cps = g.level.checkpoints

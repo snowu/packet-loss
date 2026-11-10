@@ -64,7 +64,7 @@ export class Hud {
       paused: $('paused'),
       traceFill: $('trace-fill'), traceVal: $('trace-val'), trace: $('trace-wrap'), chromeRow: $('chrome-row'),
       shop: $('shop'), shopKicker: $('shop-kicker'), shopCreds: $('shop-creds'), shopIntegrity: $('shop-integrity'),
-      shopOffer: $('shop-offer'), repair: $('btn-repair'), reroll: $('btn-reroll'), routeA: $('btn-route-a'), routeB: $('btn-route-b'), contract: $('contract'), shopOwned: $('shop-owned'),
+      shopOffer: $('shop-offer'), repair: $('btn-repair'), reroll: $('btn-reroll'), deal: $('btn-deal'), fixer: $('fixer'), fixerList: $('fixer-list'), fixerRep: $('fixer-rep'), routeA: $('btn-route-a'), routeB: $('btn-route-b'), contract: $('contract'), shopOwned: $('shop-owned'),
       shopTip: $('shop-tip'), shopPayout: $('shop-payout'),
     }
     this.segs = []
@@ -157,7 +157,7 @@ export class Hud {
     const pay = d.payout
     const line = (got, text, creds) => `<span class="${got ? 'got' : ''}">${text}${got && creds ? ` +¢${creds}` : ''}</span>`
     e.shopPayout.innerHTML = pay
-      ? line(pay.clean, 'CLEAN SECTOR', pay.cleanPay) + line(pay.fast, `FAST ${formatTime(pay.time)}`, pay.fastPay) +
+      ? line(pay.clean, 'CLEAN SECTOR', pay.cleanPay) + line(pay.fast, `FAST ${formatTime(pay.time)} / ${formatTime(pay.par)}`, pay.fastPay) +
         (pay.contract ? line(pay.contract.done, `◆ ${pay.contract.text}`, pay.contract.pay) : '') + (pay.extra ? line(true, 'GHOST MARKET', pay.extra) : '')
       : ''
     e.shopOffer.innerHTML = ''
@@ -185,10 +185,13 @@ export class Hud {
     e.reroll.innerHTML = d.reroll.cost ? `REROLL · ¢ ${d.reroll.cost}` : 'REROLL · FREE'
     ;[e.routeA, e.routeB].forEach((btn, i) => {
       const r = d.routes[i]
-      btn.className = `route heat${r.heat} ${sel === 5 + i ? 'sel' : ''}`
+      btn.className = `route heat${r.heat} ${sel === 6 + i ? 'sel' : ''}`
       btn.innerHTML = `<b>${r.name.toUpperCase()}</b><small>${r.desc}</small>`
-      btn.onclick = () => onPick(5 + i)
+      btn.onclick = () => onPick(6 + i)
     })
+    e.deal.innerHTML = `${d.deal.name} · ${d.deal.text}`
+    e.deal.className = `action deal ${sel === 5 ? 'sel' : ''} ${d.deal.ok ? '' : 'off'} ${d.deal.taken ? 'taken' : ''}`
+    e.deal.onclick = () => onPick(5)
     e.repair.classList.toggle('sel', sel === 3)
     e.reroll.classList.toggle('sel', sel === 4)
     e.repair.classList.toggle('off', !d.repair.ok)
@@ -196,6 +199,22 @@ export class Hud {
     e.repair.onclick = () => onPick(3)
     e.reroll.onclick = () => onPick(4)
     e.shopOwned.innerHTML = d.owned.length ? `<span>INSTALLED</span>${chromeTags(d.owned, d.sets)}` : ''
+  }
+
+  // The fixer, between heists. items: [{ name, desc, kind, cost, owned, ok }]
+  showFixer(on) { this.el.fixer.classList.toggle('is-hidden', !on) }
+  fixer(items, rep, sel, onPick) {
+    this.el.fixerRep.textContent = `REP ${rep.toLocaleString()}`
+    const ul = this.el.fixerList
+    ul.innerHTML = ''
+    items.forEach((it, i) => {
+      const li = document.createElement('li')
+      li.className = `${i === sel ? 'sel' : ''} ${it.owned ? 'owned' : it.ok ? '' : 'off'}`
+      li.innerHTML = `<div class="f-kind"><span>${it.kind.toUpperCase()}</span><b>${it.owned ? 'OWNED' : `${it.cost} REP`}</b></div><div class="f-name">${it.name}</div><div class="f-desc">${it.desc}</div>`
+      if (!it.owned) li.addEventListener('click', () => onPick(i))
+      ul.appendChild(li)
+      if (i === sel) li.scrollIntoView?.({ block: 'nearest' })
+    })
   }
 
   showOver(on, r) {
@@ -231,7 +250,8 @@ export class Hud {
       e.overUnit.textContent = 'PTS'
       e.overBest.classList.toggle('new', r.newBest)
       e.overBest.innerHTML = `BEST <b>${Math.floor(r.best).toLocaleString()}</b>${r.bonus ? ` · EXTRACTION <b>+${r.bonus.toLocaleString()}</b>` : ''}${r.mult > 1 ? ` · THREAT <b>×${r.mult}</b>` : ''}` +
-        (r.unlocked ? `<div class="unlocked">THREAT ${r.unlocked} UNLOCKED</div>` : '')
+        (r.unlocked ? `<div class="unlocked">THREAT ${r.unlocked} UNLOCKED</div>` : '') +
+        (r.rep ? `<div class="rep">+${r.rep} REP · ${r.repTotal.toLocaleString()} FOR THE FIXER</div>` : '')
       e.overStats.innerHTML = `<div><b>${r.stats.shards}</b><span>SHARDS</span></div><div><b>${r.stats.takedowns}</b><span>TAKEDOWNS</span></div><div><b>${r.stats.contracts}</b><span>CONTRACTS</span></div>` +
         `<div><b>${Math.floor(r.bestCombo).toLocaleString()}</b><span>BEST COMBO</span></div>`
       e.overMedals.innerHTML = r.chrome.length ? `<div class="chrome-row big">${chromeTags(r.chrome, r.sets)}</div>` : ''

@@ -690,6 +690,8 @@ function stepAir(p, input, dt, solids, level, events) {
   const g = airGravity(p, input)
   if (p.jumpHoldActive && p.vy > 0) p.jumpHoldT += dt
   p.vy = Math.max(p.vy - g * dt, -PHYS.MAX_FALL)
+  // glide: with the chrome for it, holding jump on the way down slows the fall
+  if (PHYS.GLIDE_FALL > 0 && input.jump && p.vy < -PHYS.GLIDE_FALL) p.vy = -PHYS.GLIDE_FALL
 
   const hit = sweepX(p, dt, solids)
   if (hit) {

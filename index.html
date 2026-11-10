@@ -73,8 +73,9 @@
         <div class="unlock-note perk" id="runner-perk"></div>
         <div class="unlock-note" id="unlock-note"></div>
         <div class="city-pick" id="threat-pick"><span>THREAT</span><button id="threat-prev" aria-label="Lower threat">‹</button><em id="threat-name">0</em><button id="threat-next" aria-label="Higher threat">›</button></div>
+        <div class="city-pick" id="fixer-pick"><span>REP</span><em id="rep-total">0</em><button id="btn-fixer" class="wide" aria-label="Open the fixer">FIXER ›</button></div>
         <div class="city-pick"><span>CITY</span><button id="city-prev" aria-label="Previous city palette">‹</button><em id="city-name">DRIFT</em><button id="city-next" aria-label="Next city palette">›</button></div>
-        <div class="menu-help key-only"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> city · <kbd>Q</kbd><kbd>E</kbd> runner · <kbd>T</kbd> threat · <kbd>SPACE</kbd> run · <kbd>R</kbd> restart</div>
+        <div class="menu-help key-only"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> city · <kbd>Q</kbd><kbd>E</kbd> runner · <kbd>T</kbd> threat · <kbd>F</kbd> fixer · <kbd>SPACE</kbd> run · <kbd>R</kbd> restart</div>
         <dl class="controls key-only">
           <dt><kbd>SPACE</kbd></dt><dd>Jump — hold for height, into walls to climb</dd>
           <dt><kbd>S</kbd></dt><dd>Slide — right on touchdown to chain it, before a big drop to roll</dd>
@@ -108,6 +109,17 @@
       </div>
     </div>
 
+    <div id="fixer" class="screen shop is-hidden">
+      <div class="card wide">
+        <div class="kicker"><i></i><span>BETWEEN HEISTS</span></div>
+        <h1>THE <em>FIXER</em></h1>
+        <div class="shop-status"><span id="fixer-rep">REP 0</span></div>
+        <div class="shop-tip">Every heist pays rep, win or lose. What you buy here turns up in the heists after.</div>
+        <ul id="fixer-list" class="fixer-list"></ul>
+        <div class="actions"><button id="btn-fixer-close" class="action">BACK <kbd class="key-only">ESC</kbd></button></div>
+      </div>
+    </div>
+
     <div id="shop" class="screen shop is-hidden">
       <div class="card wide">
         <div class="kicker"><i></i><span id="shop-kicker">UPLINK</span></div>
@@ -119,6 +131,7 @@
         <div class="actions shop-actions">
           <button id="btn-repair" class="action">REPAIR</button>
           <button id="btn-reroll" class="action">REROLL</button>
+          <button id="btn-deal" class="action deal"></button>
         </div>
         <div class="shop-routes">
           <span>WAY ON</span>

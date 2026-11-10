@@ -6,20 +6,22 @@
 //                     ({ shards, drones, lasers }); 0 means it can't be offered
 //   avoid             done unless it is failed (nothing to count up)
 
-const FLOW_SPEED = 15.25   // m/s, about 55 km/h
+const FLOW_SPEED = 13.9   // m/s, about 50 km/h
 
 export const CONTRACTS = [
   { id: 'takedowns', text: (n) => `${n} TAKEDOWNS`, target: (c) => (c.drones >= 3 ? Math.min(4, Math.ceil(c.drones * 0.6)) : 0) },
   { id: 'shards', text: (n) => `${n} SHARDS`, target: (c) => (c.shards >= 12 ? Math.round(c.shards * 0.6) : 0) },
-  { id: 'flow', text: (n) => `${n} S ABOVE 55 KM/H`, target: () => 12 },
-  { id: 'combo', text: (n) => `BANK A ×${n} COMBO`, target: () => 6 },
+  { id: 'flow', text: (n) => `${n} S ABOVE 50 KM/H`, target: () => 12 },
+  { id: 'combo', text: (n) => `BANK A ×${n} COMBO`, target: () => 8 },
   { id: 'landslides', text: (n) => `${n} LANDING SLIDES`, target: () => 3 },
   { id: 'ghost', text: () => 'TRACE UNDER 50%', avoid: true, target: () => 1 },
   { id: 'untouched', text: () => 'NO STUMBLES', avoid: true, target: () => 1 },
 ]
 
-export function rollContract(rng, contents, pay) {
-  const pool = CONTRACTS.map((c) => [c, c.target(contents)]).filter(([, n]) => n > 0)
+// trace: what the meter reads as the sector starts; a job to keep it low
+// isn't offered when it's already most of the way there.
+export function rollContract(rng, contents, pay, trace = 0) {
+  const pool = CONTRACTS.map((c) => [c, c.target(contents)]).filter(([c, n]) => n > 0 && !(c.id === 'ghost' && trace > 0.3))
   const [def, target] = rng.pick(pool)
   return { id: def.id, text: def.text(target), avoid: !!def.avoid, target, progress: 0, failed: false, pay }
 }
