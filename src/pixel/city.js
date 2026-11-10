@@ -165,6 +165,22 @@ export function bakeFacade({ w, roofH, style, seed, pal, wall, accentCap, mural 
   b.rect(0, 0, w, roofH, roof.base)
   b.rect(0, 0, w, 2, t.shade)
   b.rect(0, 2, w, 1, roof.shade)
+  // Large quiet slabs, inset seams and chipped coping. Baked once with the
+  // facade; the walkable front edge remains an uninterrupted bright line.
+  const seam = pack(mix(roofRaw, pal.shadow, 0.25))
+  const lip = pack(mix(roofRaw, pal.light, 0.22))
+  for (let x = 16 + Math.floor(r(80) * 20); x < w - 2; x += 37) {
+    b.rect(x, 3, 1, Math.max(0, roofH - 5), seam)
+    b.rect(x + 1, 4, 1, Math.max(0, roofH - 7), lip)
+    if (hash(seed, x, 81) < 0.45) {
+      b.rect(x - 3, 3, 4, 1, seam)
+      b.rect(x - 2, 4, 1, 1, lip)
+    }
+  }
+  for (let x = 6; x < w - 4; x += 23) {
+    b.rect(x, 0, 1, 2, roof.shade)
+    if (hash(seed, x, 82) < 0.4) b.rect(x + 2, 1, 3, 1, lip)
+  }
   b.rect(0, roofH - 1, w, 1, roof.light)
 
   // cornice

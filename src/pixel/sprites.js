@@ -115,6 +115,23 @@ function drawDecor(type, variant, pal, { classic = false } = {}) {
     b.rect(2, 14, 26, 1, dark); b.rect(2, 24, 26, 1, dark)
     b.rect(25, 10, 3, 20, wood.deep)
     for (let y = 0; y < 10; y++) b.rect(15 - y * 1.4, y, y * 2.8, 1, dark)
+    // Copper roof facets, stave highlights, metal hoops and bolted feet.
+    for (let y = 2; y < 9; y++) {
+      b.rect(15 - y * 1.4, y, y * 1.1, 1, metal.shade)
+      b.set(Math.round(15 - y * 1.4), y, metal.light)
+    }
+    b.rect(12, 0, 5, 1, metal.light)
+    for (const x of [3, 7, 11, 15, 19]) {
+      b.rect(x, 11, 1, 18, wood.light)
+      b.set(x + 1, 18 + x % 5, wood.deep)
+    }
+    for (const y of [14, 24, 29]) {
+      b.rect(2, y, 26, 1, metal.deep)
+      b.rect(3, y, 20, 1, metal.shade)
+      b.set(4, y, metal.light); b.set(21, y, metal.light)
+    }
+    b.line(5, 49, 22, 33, metal.shade)
+    for (const x of [3, 12, 21]) b.rect(x, 50, 4, 2, metal.shade)
     return b
   }
   if (type === 'antenna') {
@@ -136,6 +153,14 @@ function drawDecor(type, variant, pal, { classic = false } = {}) {
     b.rect(14, 5, 2, 7, metal.deep); b.rect(11, 8, 8, 1, metal.deep)
     for (let y = 5; y < 13; y += 2) b.rect(2, y, 6, 1, metal.shade)
     b.rect(22, 2, 2, 13, metal.deep)
+    // Recessed fan grille and split service panel, legible at native size.
+    b.rect(0, 13, 24, 2, dark)
+    b.rect(1, 1, 21, 1, metal.base)
+    b.rect(9, 3, 1, 10, metal.deep)
+    for (const y of [6, 8, 10]) b.rect(12, y, 7, 1, metal.deep)
+    b.set(15, 8, metal.light)
+    for (const [x, y] of [[1, 3], [21, 3], [1, 12], [21, 12]]) b.set(x, y, metal.light)
+    b.rect(3, 3, 3, 1, pack(mix(pal.roof, [164, 128, 88], 0.6)))
     return b
   }
   if (type === 'dish') {
@@ -158,6 +183,9 @@ function drawDecor(type, variant, pal, { classic = false } = {}) {
       b.rect(x, 14 - h, 4, h, metal.base)
       b.rect(x - 1, 14 - h, 6, 2, metal.light)
       b.rect(x + 3, 14 - h + 2, 1, h - 2, metal.deep)
+      b.rect(x, 14 - h + 3, 1, h - 4, metal.light)
+      b.rect(x, 11, 3, 1, metal.shade)
+      b.set(x + 1, 14 - h, dark)
     }
     return b
   }
