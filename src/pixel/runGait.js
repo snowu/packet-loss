@@ -14,22 +14,37 @@ export const SHOE = Object.freeze({ x: -2.15, y: -0.9, w: 7.6, h: 4.3 })
 export const soleHeight = tilt => (SHOE.y + SHOE.h) * Math.cos(tilt) +
   Math.max(SHOE.x * Math.sin(tilt), (SHOE.x + SHOE.w) * Math.sin(tilt))
 
+// Rotate about the heel at strike and the toe at push-off. Translating only
+// the ankle plants its height but drags the visible contact across the roof.
+export function plantedAnkle(x, tilt) {
+  const pivot = tilt < 0 ? SHOE.x : SHOE.x + SHOE.w
+  return [x + pivot * (1 - Math.cos(tilt)) + (SHOE.y + SHOE.h) * Math.sin(tilt), -soleHeight(tilt)]
+}
+
 function swing(u, reach) {
   // Hermite tangents are in pixels per cycle. Match ground velocity at both
   // ends; easing every segment to a stop made the recovering feet hitch.
   const speed = -RUN_STRIDE * PPU
+  const start = plantedAnkle(-reach, 0.45), end = plantedAnkle(reach, -0.16)
+  // Toe roll is still moving at lift-off; heel roll is moving at strike.
+  const velocity = (tilt, rate, pivot) => [
+    speed + (pivot * Math.sin(tilt) + (SHOE.y + SHOE.h) * Math.cos(tilt)) * rate,
+    ((SHOE.y + SHOE.h) * Math.sin(tilt) - pivot * Math.cos(tilt)) * rate,
+  ]
+  const out = velocity(0.45, 0.9 / (STANCE - 0.25), SHOE.x + SHOE.w)
+  const into = velocity(-0.16, 1.6, SHOE.x)
   const keys = [
-    [STANCE, -reach, -soleHeight(0.45), speed, -28],
-    [0.51, -11, -11, 55, -40],
-    [0.69, 0, -13, 75, 15],
-    [0.86, 11, -7, 30, 42],
-    [1, reach, -soleHeight(-0.16), speed, 0],
+    [STANCE, ...start, 0.45, ...out, 0.9 / (STANCE - 0.25)],
+    [0.51, -11, -11, 0.85, 55, -40, -1],
+    [0.69, 0, -13, 0.1, 75, 15, -4],
+    [0.86, 11, -7, -0.35, 30, 42, 0],
+    [1, ...end, -0.16, ...into, 1.6],
   ]
   const i = Math.min(3, keys.findIndex((k, i) => i < 4 && u < keys[i + 1][0]))
   const a = keys[i], b = keys[i + 1], span = b[0] - a[0], t = (u - a[0]) / span
   const h00 = 2 * t ** 3 - 3 * t ** 2 + 1, h10 = t ** 3 - 2 * t ** 2 + t
   const h01 = -2 * t ** 3 + 3 * t ** 2, h11 = t ** 3 - t ** 2
-  return [1, 2].map(j => h00 * a[j] + h10 * span * a[j + 2] + h01 * b[j] + h11 * span * b[j + 2])
+  return [1, 2, 3].map(j => h00 * a[j] + h10 * span * a[j + 3] + h01 * b[j] + h11 * span * b[j + 3])
 }
 
 export class RunGait {
@@ -72,11 +87,11 @@ export function runPose(phase) {
       // Moving backwards by exactly the world distance travelled keeps the
       // sole planted on the roof until toe-off.
       tilt = u < 0.10 ? -0.16 * (1 - u / 0.10) : u > 0.25 ? 0.45 * ((u - 0.25) / (STANCE - 0.25)) ** 2 : 0
-      ankle = [reach - RUN_STRIDE * PPU * u, -soleHeight(tilt)]
+      ankle = plantedAnkle(reach - RUN_STRIDE * PPU * u, tilt)
     } else {
-      const v = (u - STANCE) / (1 - STANCE)
-      ankle = swing(u, reach)
-      tilt = 0.45 * (1 - v) - 0.16 * v + 0.45 * Math.sin(v * Math.PI)
+      const recovery = swing(u, reach)
+      ankle = recovery.slice(0, 2)
+      tilt = recovery[2]
     }
     return { hip, knee: kneeBetween(hip, ankle), ankle, tilt, planted: u < STANCE }
   }

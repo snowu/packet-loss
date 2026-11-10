@@ -83,6 +83,37 @@ try {
     return cv.toDataURL('image/png').split(',')[1]
   })
   writeFileSync(`${output}/run-cycle.png`, Buffer.from(sheet, 'base64'))
+  // A portable, animated review: scrubbing and a skeleton overlay expose
+  // registration errors that an eight-frame contact sheet can hide.
+  const study = await page.evaluate(async () => {
+    const { RUN_FRAMES, runPose } = await import('/packet-loss/src/pixel/runGait.js')
+    const { RUN_ORIGIN, armPose, shoulderAt } = await import('/packet-loss/src/pixel/runRig.js')
+    const outfits = ['courier', 'windbreaker', 'techwear'], v = window.__game.view
+    const cv = document.createElement('canvas'); cv.width = 112 * RUN_FRAMES; cv.height = 96 * outfits.length
+    const c = cv.getContext('2d')
+    const skeletons = outfits.map((outfit, row) => Array.from({ length: RUN_FRAMES }, (_, frame) => {
+      c.drawImage(v.runFrames[outfit][frame], frame * 112, row * 96)
+      const pose = runPose(frame / RUN_FRAMES), torso = v.art.rigs[outfit][0]
+      const shoulder = shoulderAt(pose, torso.width / torso.height)
+      return [pose.far, pose.near].map(l => [l.hip, l.knee, l.ankle]).concat([-pose.arm, pose.arm].map(angle => {
+        const a = armPose(shoulder, angle); return [a.shoulder, a.elbow, a.wrist]
+      })).map(chain => chain.map(p => p.map((x, i) => (x + RUN_ORIGIN[i]) * 2)))
+    }))
+    return { atlas: cv.toDataURL(), skeletons, outfits }
+  })
+  writeFileSync(`${output}/run-cycle.html`, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Runner rig review</title><style>
+body{background:#16121f;color:#eee8db;font:16px system-ui;margin:32px auto;max-width:1080px;padding:0 16px}button,input{accent-color:#ff6654}button{padding:8px 16px}main{display:flex;flex-wrap:wrap;gap:20px}canvas{width:300px;height:258px;image-rendering:pixelated;background:#292331}label{display:inline-block;margin:12px}p{color:#bfaecf}input[type=range]{width:280px}
+</style><h1>Runner rig review</h1><p>All 64 cached gameplay frames. Slow playback or scrub to check shoulder, knee and shoe registration.</p>
+<button id="play">Pause</button><label>Frame <input id="frame" type="range" min="0" max="63" value="0"><output id="number">0</output></label><label><input id="bones" type="checkbox"> Skeleton</label><label><input id="slow" type="checkbox" checked> Slow motion</label><main></main>
+<script>const study=${JSON.stringify(study)};
+const image=new Image();image.src=study.atlas;let running=true,phase=0,last=0;
+const slider=document.getElementById('frame'),bones=document.getElementById('bones'),slow=document.getElementById('slow'),play=document.getElementById('play');
+const contexts=study.outfits.map(name=>{const box=document.createElement('section');const title=document.createElement('h2');title.textContent=name;const cv=document.createElement('canvas');cv.width=112;cv.height=96;box.append(title,cv);document.querySelector('main').append(box);return cv.getContext('2d')});
+function draw(){const frame=Math.floor(phase)%64;slider.value=frame;document.getElementById('number').value=frame;contexts.forEach((c,row)=>{c.clearRect(0,0,112,96);c.strokeStyle='#7a6a83';c.lineWidth=.5;c.beginPath();c.moveTo(0,90);c.lineTo(112,90);c.stroke();c.drawImage(image,frame*112,row*96,112,96,0,0,112,96);if(bones.checked)study.skeletons[row][frame].forEach((chain,i)=>{c.strokeStyle=i%2?'#ffcf66':'#55ddeb';c.lineWidth=.6;c.beginPath();chain.forEach((p,j)=>j?c.lineTo(...p):c.moveTo(...p));c.stroke();chain.forEach(p=>{c.beginPath();c.arc(...p,1,0,Math.PI*2);c.fillStyle=c.strokeStyle;c.fill()})})})}
+play.onclick=()=>{running=!running;play.textContent=running?'Pause':'Play'};slider.oninput=()=>{running=false;play.textContent='Play';phase=Number(slider.value);draw()};bones.onchange=draw;
+function tick(now){if(last&&running)phase=(phase+Math.min(now-last,100)/1000*64*(slow.checked?.6:2.8))%64;last=now;if(image.complete)draw();requestAnimationFrame(tick)}requestAnimationFrame(tick);
+</script>`)
   assert.deepEqual(errors, [])
   console.log('Gait/audio browser check:', JSON.stringify(report))
   await page.close()

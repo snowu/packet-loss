@@ -2,8 +2,26 @@ import { RUN_FRAMES, runPose, SHOE } from './runGait.js'
 
 // Pivots are fractions of each trimmed cutout: shoulder/elbow, hip/knee,
 // knee/ankle. The same registered kit is used by all three outfits.
-const JOINTS = [null, [[0.48, 0.14], [0.51, 0.875]], [[0.42, 0.10], [0.57, 0.80]], [[0.38, 0.095], [0.77, 0.90]], [[0.56, 0.10], [0.46, 0.93]]]
+const JOINTS = [null, [[0.48, 0.14], [0.47, 0.875]], [[0.42, 0.10], [0.52, 0.70]], [[0.38, 0.095], [0.77, 0.84]], [[0.61, 0.11], [0.46, 0.93]]]
+export const TORSO = Object.freeze({ height: 21, hip: [0.715, 0.905], shoulder: [0.61, 0.555] })
 export const RUN_ORIGIN = [28, 45]
+
+// Bind the shoulder to the same source landmark and transform used to paint
+// the torso. A separate world-space guess left the arms floating in front.
+export function shoulderAt(pose, aspect) {
+  const x = (TORSO.shoulder[0] - TORSO.hip[0]) * TORSO.height * aspect
+  const y = (TORSO.shoulder[1] - TORSO.hip[1]) * TORSO.height
+  return [pose.hip[0] + x * Math.cos(pose.lean) - y * Math.sin(pose.lean), pose.hip[1] + x * Math.sin(pose.lean) + y * Math.cos(pose.lean)]
+}
+
+export function armPose(shoulder, angle) {
+  const elbow = [shoulder[0] + Math.sin(angle) * 5.7, shoulder[1] + Math.cos(angle) * 5.7]
+  // Keep the hand in front of and above the elbow throughout the pump. The
+  // forearm's absolute angle follows the upper arm with a smaller amplitude.
+  const fore = 2.05 + angle * 0.45
+  const wrist = [elbow[0] + Math.sin(fore) * 4.4, elbow[1] + Math.cos(fore) * 4.4]
+  return { shoulder, elbow, wrist }
+}
 
 function bone(ctx, image, id, from, to) {
   const [a, b] = JOINTS[id].map(p => [p[0] * image.width, p[1] * image.height])
@@ -29,8 +47,7 @@ function drawLeg(ctx, parts, leg) {
 }
 
 function drawArm(ctx, parts, shoulder, angle) {
-  const elbow = [shoulder[0] + Math.sin(angle) * 5.7, shoulder[1] + Math.cos(angle) * 5.7]
-  const wrist = [elbow[0] + Math.sin(angle + 1.8) * 4.4, elbow[1] + Math.cos(angle + 1.8) * 4.4]
+  const { elbow, wrist } = armPose(shoulder, angle)
   bone(ctx, parts[1], 1, shoulder, elbow)
   bone(ctx, parts[2], 2, elbow, wrist)
 }
@@ -45,13 +62,14 @@ export function bakeRunFrames(parts) {
   return Array.from({ length: RUN_FRAMES }, (_, i) => {
     const cv = document.createElement('canvas'); cv.width = 112; cv.height = 96
     const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.translate(...RUN_ORIGIN); ctx.imageSmoothingEnabled = false
-    const pose = runPose(i / RUN_FRAMES), shoulder = [1.4, pose.hip[1] - 8.9]
+    const pose = runPose(i / RUN_FRAMES), torso = parts[0]
+    const shoulder = shoulderAt(pose, torso.width / torso.height)
     drawArm(ctx, far, shoulder, -pose.arm)
     drawLeg(ctx, far, pose.far)
     drawLeg(ctx, parts, pose.near)
     ctx.save(); ctx.translate(...pose.hip); ctx.rotate(pose.lean)
-    const torso = parts[0], h = 21, w = torso.width / torso.height * h
-    ctx.drawImage(torso, -w * 0.715, -h * 0.932, w, h); ctx.restore()
+    const h = TORSO.height, w = torso.width / torso.height * h
+    ctx.drawImage(torso, -w * TORSO.hip[0], -h * TORSO.hip[1], w, h); ctx.restore()
     drawArm(ctx, parts, shoulder, pose.arm)
     return cv
   })

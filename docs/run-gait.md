@@ -27,17 +27,26 @@ The recovery uses a continuous Hermite path with matching horizontal velocity
 at contact and toe-off instead of stopping at every intermediate pose. Tests
 cover sole clearance, constant bone lengths and continuity at recovery keys.
 
+The shoulder is registered to the painted torso and follows its hip transform
+and lean, rather than using an independent position. Elbow, wrist and knee
+landmarks are registered inside the cutouts; hands remain above and ahead of
+the elbows during the arm pump. Heel strike and toe-off rotate around the
+sole contact, with matching ankle and shoe-angle velocities into recovery.
+
 ## Review
 
 ![Eight phases of all three outfits](screenshots/gait/run-cycle.png)
 
-[Actual gameplay recording with live game audio](screenshots/gait/gameplay-with-audio.mp4)
+[Animated rig review with frame scrubbing and skeleton overlay](screenshots/gait/run-cycle.html)
+is self-contained and can be opened directly in a browser. It shows all 64
+cached frames for all three outfits, at slow or gameplay speed.
+
+[Actual gameplay recording with live game audio](screenshots/gait/gameplay-with-audio.webm)
 
 `node bench/gait-review.js` checks the actual game's audio callbacks against its
 rendered gait across all three outfits, focus and pause, and writes the stride
-sheet. `--record` also records ten seconds of actual gameplay with Web Audio
-mixed into the canvas recording (WebM). The checked-in MP4 is a transcode of that
-recording. `tests/runGait.test.js` checks speed/draw-rate independence, contact
+sheet and animated review. `--record` also records ten seconds of actual gameplay with Web Audio
+mixed into the canvas recording (WebM). `tests/runGait.test.js` checks speed/draw-rate independence, contact
 alternation, focus, transitions, teleport reset, stance registration and bone
 lengths across the cycle. CI runs both the unit and browser checks.
 
