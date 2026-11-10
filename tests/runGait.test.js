@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { RunGait, RUN_STRIDE, STANCE, runFrame, runPose } from '../src/pixel/runGait.js'
+import { RunGait, RUN_STRIDE, STANCE, SHOE, runFrame, runPose } from '../src/pixel/runGait.js'
 
 const runner = speed => ({ state: 'run', speed })
 
@@ -59,11 +59,24 @@ describe('distance-driven run gait', () => {
         expect(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1])).toBeCloseTo(9.5, 8)
         const u = (phase + offset) % 1
         if (u < STANCE) {
-          expect(leg.ankle[1]).toBe(-3.4)
+          const soles = [SHOE.x, SHOE.x + SHOE.w].map(x => leg.ankle[1] + x * Math.sin(leg.tilt) + (SHOE.y + SHOE.h) * Math.cos(leg.tilt))
+          expect(Math.max(...soles)).toBeCloseTo(0, 8)
           expect(leg.ankle[0] + u * RUN_STRIDE * 14).toBeCloseTo(RUN_STRIDE * 14 * STANCE / 2, 8)
         }
       }
     }
     expect(runPose(0)).toEqual(runPose(1))
+  })
+
+  it('recovers continuously without stopping at swing keys or snapping at contact', () => {
+    const eps = 1e-6
+    for (const t of [STANCE, 0.51, 0.69, 0.86, 1]) {
+      const before = runPose(t - eps).near, after = runPose(t + eps).near
+      expect(Math.hypot(after.ankle[0] - before.ankle[0], after.ankle[1] - before.ankle[1])).toBeLessThan(0.001)
+      expect(Math.abs(after.tilt - before.tilt)).toBeLessThan(0.001)
+      const left = (runPose(t).near.ankle[0] - before.ankle[0]) / eps
+      const right = (after.ankle[0] - runPose(t).near.ankle[0]) / eps
+      expect(Math.abs(left - right)).toBeLessThan(0.01)
+    }
   })
 })

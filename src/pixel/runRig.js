@@ -1,21 +1,25 @@
-import { RUN_FRAMES, runPose } from './runGait.js'
+import { RUN_FRAMES, runPose, SHOE } from './runGait.js'
 
 // Pivots are fractions of each trimmed cutout: shoulder/elbow, hip/knee,
 // knee/ankle. The same registered kit is used by all three outfits.
-const JOINTS = [null, [[0.48, 0.14], [0.51, 0.875]], [[0.42, 0.10], [0.57, 0.80]], [[0.38, 0.095], [0.77, 0.84]], [[0.56, 0.10], [0.46, 0.93]]]
+const JOINTS = [null, [[0.48, 0.14], [0.51, 0.875]], [[0.42, 0.10], [0.57, 0.80]], [[0.38, 0.095], [0.77, 0.90]], [[0.56, 0.10], [0.46, 0.93]]]
 export const RUN_ORIGIN = [28, 45]
 
 function bone(ctx, image, id, from, to) {
   const [a, b] = JOINTS[id].map(p => [p[0] * image.width, p[1] * image.height])
   const angle = Math.atan2(to[1] - from[1], to[0] - from[0]) - Math.atan2(b[1] - a[1], b[0] - a[0])
   const scale = Math.hypot(to[0] - from[0], to[1] - from[1]) / Math.hypot(b[0] - a[0], b[1] - a[1])
-  ctx.save(); ctx.translate(...from); ctx.rotate(angle); ctx.scale(scale, scale)
+  // Compress across the bone, in its own coordinate system. Uniform scaling
+  // turned the baggy cutouts into oversized overlapping knee/ankle lumps.
+  const sourceAngle = Math.atan2(b[1] - a[1], b[0] - a[0])
+  ctx.save(); ctx.translate(...from); ctx.rotate(angle + sourceAngle)
+  ctx.scale(scale, scale * (id >= 3 ? 0.72 : 1)); ctx.rotate(-sourceAngle)
   ctx.drawImage(image, -a[0], -a[1]); ctx.restore()
 }
 
 function boot(ctx, image, leg) {
   ctx.save(); ctx.translate(...leg.ankle); ctx.rotate(leg.tilt)
-  ctx.drawImage(image, -2.15, -0.9, 7.6, 4.3); ctx.restore()
+  ctx.drawImage(image, SHOE.x, SHOE.y, SHOE.w, SHOE.h); ctx.restore()
 }
 
 function drawLeg(ctx, parts, leg) {

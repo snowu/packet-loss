@@ -19,6 +19,14 @@ the same half-stride contacts. It does not advance during pause, idle or flight,
 and resets on a new run or teleport. Landing retains its existing impact sound.
 The running rig is pre-baked; gameplay still draws one cached image per runner.
 
+The leg art is scaled along and across each bone separately, with a corrected
+thigh pivot, to avoid doubled, bulky knees. The pelvis now sits higher with a
+smaller bounce. Shoe bounds are shared by the pose solver and renderer: heel
+strike and toe-off lift the ankle so the lowest sole corner stays on the roof.
+The recovery uses a continuous Hermite path with matching horizontal velocity
+at contact and toe-off instead of stopping at every intermediate pose. Tests
+cover sole clearance, constant bone lengths and continuity at recovery keys.
+
 ## Review
 
 ![Eight phases of all three outfits](screenshots/gait/run-cycle.png)
