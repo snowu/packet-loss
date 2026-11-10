@@ -38,10 +38,13 @@ are fixed. Fonts are blocked for consistent fallback typography.
 
 ## Validation
 
-- `npm test`: 19 files, 172 tests passed.
+- `npm test -- --maxWorkers=1 --testTimeout=30000`: 20 files, 190 tests passed
+  after merging current master. A prior parallel run timed out one art test
+  at its default five-second limit; the serial rerun passed.
 - `npm run build`: passed.
 - `npm run test:render`: passed with Playwright's headless shell (the system
   Chromium executable requires a Unix socket unavailable in this environment).
+- `npm run bench:check`: all scenarios within budget.
 - The art-review CI job runs unit tests, builds, and captures the same seeded
   Heist frame on the PR base and proposed branch in dry/wet Kowloon and phone
   portrait. Download its `art-review` artifact to inspect gameplay frames.
