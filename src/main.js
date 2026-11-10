@@ -13,6 +13,8 @@ import { Input } from './input.js'
 import { Audio } from './audio.js'
 import { Hud, formatTime, medalFor } from './ui/hud.js'
 import { PixelView } from './pixel/view.js'
+import { ConceptView } from './pixel/conceptView.js'
+import { loadConceptArt } from './pixel/conceptArt.js'
 import { loadArt } from './pixel/artPng.js'
 import { PALETTE_NAMES, pinPalette } from './pixel/palette.js'
 import { RUNNERS, RUNNER_STYLES } from './pixel/runner.js'
@@ -39,7 +41,8 @@ const fixedSeed = params.has('seed') ? Number(params.get('seed')) : null
 
 // the sprite PNGs (public/art) must be in before the first sprite is baked and cached
 await loadArt()
-const view = new PixelView()
+const conceptReady = params.get('art') !== 'legacy' && await loadConceptArt()
+const view = conceptReady ? new ConceptView() : new PixelView()
 const input = new Input()
 const audio = new Audio()
 const hud = new Hud(isTouch)

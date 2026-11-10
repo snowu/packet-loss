@@ -66,7 +66,9 @@ Two pieces from the same maker (stacks count) switch on that maker's set:
 
 ## Look
 
-Everything is pixel art drawn in code on a low-resolution canvas, with a chiptune score. Facades, neon signage, billboards, sky traffic, props, skyline and sky are generated procedurally from curated palettes. The ads are a little world of their own: hand-drawn products and mascots (energy drinks, ramen, a lucky cat, an all-seeing eye), parody slogans and faux-kanji neon. Skyline towers carry rooftop billboards, spinning holo projections, round signs, cloth banners, live screens and LED tickers; the buildings you run on have street posters with graffiti, neon tube signs, screens and big rooftop boards. Each building gets its own window rhythm, lights come on in rooms and whole floors rather than scattered windows, and the lower floors sink into shadow so the rooftop you run on reads first. Obstacles get their own high-contrast treatment: dark outlined steel, red edges and a pulsing glow, so they read against busy rooftops. Pipe banks you slide under carry a red band and strap at head height. The lane stays the calmest part of the frame: the runner has a thin halo off her outline, the skyline just above the roofline washes into haze, roof equipment that isn't an obstacle fades back, and the facades sink into shadow below the lane. The runner is a skeleton with springy joints and a simulated ponytail, rasterized into an outlined sprite at a stepped 24 fps.
+The default renderer uses the approved art-sheet design: three animated character atlases, a detailed rooftop kit, textured facades and roofs, and a scrolling cyberpunk skyline on a canvas with twice the previous raster resolution in each axis. Red marks traversal, magenta marks security, and cyan marks data. Heist, Endless and Trials use the same movement simulation, with all five district treatments, rain, focus and ghost playback.
+
+See [the art-sheet prototype](docs/concept-art.md) for actual gameplay captures, production poses, asset sources and validation. Add `?art=legacy` to compare with the original procedural renderer. The original renderer and its skeletal runner also remain the automatic fallback when production artwork cannot load.
 
 ## Setup
 
@@ -108,6 +110,11 @@ Anything you can use is painted runner-vision red. Puddles and broken neon refle
 - `src/ui/`, `src/input.js` and `src/audio.js` are the HUD, the input layer (keyboard, touch and gamepad), and fully synthesized audio and music.
 
 ## Redrawing the art
+
+The production renderer loads the 4×4 character and environment atlases in `public/concept-art/`; see [the atlas layout and generation prompts](docs/concept-art.md). Preserve the grid and transparent gutters when editing those files.
+
+The workflow below applies to the **legacy renderer**, available with `?art=legacy`:
+
 
 The drones, birds, sky cars, rooftop props and brand signs, and the ad mascots are drawn from PNGs in `public/art/<folder>/<id>.png`. That folder is what the game ships, so painting over a PNG there (same name, same canvas size) and merging it is all it takes: there is no second copy and no command to run. Open the repository in [spritewright](https://snowu.github.io/spritewright/?repo=snowu/packet-loss) or use any pixel editor.
 

@@ -19,13 +19,14 @@ try {
   mkdirSync(output, { recursive: true })
   for (const [name, district, rain, width, height] of [
     ['kowloon', 1, 0, 1280, 720], ['kowloon-wet', 1, 1, 1280, 720], ['phone', 1, 1, 390, 844],
+    ...(args.all ? [['acid-rain', 2, 1, 1280, 720], ['neon-dusk', 0, 0, 1280, 720], ['smog-noon', 3, 0, 1280, 720], ['blackout', 4, 1, 1280, 720]] : []),
   ]) {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
     const errors = []
     page.on('pageerror', e => errors.push(e.message))
     await page.route(/https:\/\/fonts\./, r => r.abort())
     await page.addInitScript(`${pin}; pinWorld()`)
-    await page.goto(`${server.resolvedUrls.local[0]}?seed=12345&quality=0`)
+    await page.goto(`${server.resolvedUrls.local[0]}?seed=12345&quality=0${args.legacy ? '&art=legacy' : ''}`)
     // The page's timers are pinned, so poll from Node (as bench.js does).
     const deadline = Date.now() + 30000
     let ready = false
@@ -34,7 +35,7 @@ try {
       if (!ready) await pause(20)
     }
     if (!ready) throw new Error(`${name}: game startup failed: ${errors.join('; ') || 'timeout'}`)
-    await page.evaluate(async ({ district, rain }) => {
+    await page.evaluate(async ({ district, rain, frames }) => {
       const { pinPalette } = await import('/packet-loss/src/pixel/palette.js')
       const { Bot } = await import('/packet-loss/src/sim/bot.js')
       pinPalette(district)
@@ -44,8 +45,8 @@ try {
       // Synchronous sprite bakes make captures independent of worker timing.
       G.view.baker.worker?.terminate(); G.view.baker.worker = null
       Object.assign(G.view.weather, { ready: true, rain, wet: rain, target: rain, clock: 1e9 })
-      for (let i = 0; i < 420; i++) window.__tick()
-    }, { district, rain })
+      for (let i = 0; i < frames; i++) window.__tick()
+    }, { district, rain, frames: Number(args.frame || 420) })
     if (errors.length) throw new Error(errors.join('\n'))
     await page.screenshot({ path: resolve(output, `${tag}-${name}.png`), animations: 'disabled' })
     console.log(`${tag}-${name}: actual game viewport captured`)

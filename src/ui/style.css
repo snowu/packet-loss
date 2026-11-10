@@ -559,3 +559,19 @@ body.pixel .rotate { white-space: normal; text-align: center; width: max-content
   pointer-events: none;
   contain: content;
 }
+
+/* Art-sheet presentation: leave the detailed scene visible around a compact HUD. */
+body.concept-art .hud-tl { top: 15px; left: 18px; }
+body.concept-art .chip { background: rgba(9, 7, 20, 0.65); padding: 4px 9px; border-left-width: 2px; }
+body.concept-art .dist { font-size: 28px; text-shadow: none; }
+body.concept-art .dist small { font-size: 11px; }
+body.concept-art .sub { font-size: 9px; letter-spacing: 0.08em; }
+body.concept-art .frame-meter { opacity: 0.5; }
+body.concept-art .card { background: rgba(12, 9, 29, 0.9); }
+@media (max-width: 600px) {
+  body.concept-art .hud-tl { top: 70px; left: 12px; }
+  body.concept-art .chip { padding: 3px 7px; }
+  body.concept-art .dist { font-size: 22px; }
+  body.concept-art .contract { max-width: 220px; overflow: hidden; text-overflow: ellipsis; font-size: 8px; }
+  body.concept-art .sub { font-size: 8px; }
+}
