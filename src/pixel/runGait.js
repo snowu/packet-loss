@@ -9,7 +9,7 @@ export const CONTACT_X = 5
 const STRIKE_TILT = -0.08
 const PUSH_TILT = 0.38
 const FLAT_AT = 0.08
-const ROLL_AT = 0.18
+const ROLL_AT = 0.14
 export const RECOVERY_KEYS = [STANCE, 0.43, 0.64, 0.83, 1]
 const TAU = Math.PI * 2
 const wrap = x => ((x % 1) + 1) % 1
@@ -17,7 +17,7 @@ const wrap = x => ((x % 1) + 1) % 1
 // Local shoe coordinates, shared with the renderer. Roll around the sole's
 // lowest point so heel strike and toe-off never bury the shoe in the roof.
 export const SHOE = Object.freeze({ x: -2.15, y: -0.9, w: 7.6, h: 4.3 })
-export const soleHeight = tilt => (SHOE.y + SHOE.h) * Math.cos(tilt) +
+export const soleHeight = tilt => Math.max(SHOE.y * Math.cos(tilt), (SHOE.y + SHOE.h) * Math.cos(tilt)) +
   Math.max(SHOE.x * Math.sin(tilt), (SHOE.x + SHOE.w) * Math.sin(tilt))
 
 // Rotate about the heel at strike and the toe at push-off. Translating only
@@ -86,10 +86,28 @@ export function kneeBetween(hip, ankle, thigh = 9.6, shin = 9.5) {
   return [hip[0] + dx / length * along + dy / length * bend, hip[1] + dy / length * along - dx / length * bend]
 }
 
+export function shinFootAngle(knee, ankle) {
+  // A neutral ankle puts the shoe perpendicular to the shin. A shoe held
+  // horizontal in world space folds backwards through a recovering calf.
+  return Math.atan2(knee[0] - ankle[0], ankle[1] - knee[1])
+}
+
+const smooth = x => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t) }
+
+function recoveryFoot(u, knee, ankle, roll) {
+  const v = (u - STANCE) / (1 - STANCE)
+  const flex = 0.12 - 0.24 * smooth(v / 0.6)
+  const anatomical = shinFootAngle(knee, ankle) + flex
+  // Only the ground controls the shoe's world angle. Ease out of toe roll
+  // and back into strike with zero blend velocity at both boundaries.
+  const weight = smooth((u - STANCE) / 0.10) * smooth((1 - u) / 0.14)
+  return roll + (anatomical - roll) * weight
+}
+
 export function runPose(phase) {
   // Compression follows contact; extension and flight follow push-off. The
   // old low, almost stationary pelvis forced a squat through the whole run.
-  const t = wrap(phase), hip = [0, -21.4 + 1.2 * Math.cos((t - 0.11) * TAU * 2)]
+  const t = wrap(phase), hip = [0, -21.75 + 0.55 * Math.cos((t - 0.11) * TAU * 2)]
   const leg = offset => {
     const u = wrap(t + offset), reach = CONTACT_X
     let ankle, tilt
@@ -103,7 +121,9 @@ export function runPose(phase) {
       ankle = recovery.slice(0, 2)
       tilt = recovery[2]
     }
-    return { hip, knee: kneeBetween(hip, ankle), ankle, tilt, planted: u < STANCE }
+    const knee = kneeBetween(hip, ankle)
+    if (u >= STANCE) tilt = recoveryFoot(u, knee, ankle, tilt)
+    return { hip, knee, ankle, tilt, planted: u < STANCE }
   }
   // Counter the thigh drive, which peaks before contact, rather than the
   // ankle contact clock. The old arms lagged the legs by a quarter cycle.

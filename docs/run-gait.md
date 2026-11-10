@@ -37,6 +37,12 @@ the knee drives forward. The shin owns the kneecap: the duplicate pad at the
 end of the thigh cutout is clipped. Far limbs have stronger depth shading.
 Heel strike and toe-off rotate around the
 sole contact, with matching ankle and shoe-angle velocities into recovery.
+Airborne shoe orientation follows the solved shin with a small relative ankle
+flex, blended into ground roll at lift-off and strike. A separate world-angle
+track previously folded the recovering ankle backwards by nearly 80 degrees.
+Reduced stance compression and earlier heel roll keep the planted ankle from
+over-flexing too. The skeleton overlay includes the toe, so foot orientation
+can be inspected alongside the knee and ankle.
 
 ## Review
 
@@ -55,7 +61,7 @@ shows both cycles at the same phase, with optional skeleton overlays.
 
 `node bench/gait-review.js` checks the actual game's audio callbacks against its
 rendered gait across all three outfits, focus and pause, and writes the stride
-sheet and animated review. `--compare=f742886` also generates the synchronized
+sheet and animated review. `--compare=72fd084` also generates the synchronized
 before/after review and sheet from that commit's cached review frames.
 `--record` also records ten seconds of actual gameplay with Web Audio
 mixed into the canvas recording (WebM). `tests/runGait.test.js` checks speed/draw-rate independence, contact

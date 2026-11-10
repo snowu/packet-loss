@@ -87,7 +87,7 @@ try {
   // A portable, animated review: scrubbing and a skeleton overlay expose
   // registration errors that an eight-frame contact sheet can hide.
   const study = await page.evaluate(async () => {
-    const { RUN_FRAMES, runPose } = await import('/packet-loss/src/pixel/runGait.js')
+    const { RUN_FRAMES, runPose, SHOE } = await import('/packet-loss/src/pixel/runGait.js')
     const { RUN_ORIGIN, armPose, shoulderAt } = await import('/packet-loss/src/pixel/runRig.js')
     const outfits = ['courier', 'windbreaker', 'techwear'], v = window.__game.view
     const cv = document.createElement('canvas'); cv.width = 112 * RUN_FRAMES; cv.height = 96 * outfits.length
@@ -96,7 +96,11 @@ try {
       c.drawImage(v.runFrames[outfit][frame], frame * 112, row * 96)
       const pose = runPose(frame / RUN_FRAMES), torso = v.art.rigs[outfit][0]
       const shoulder = shoulderAt(pose, torso.width / torso.height)
-      return [pose.far, pose.near].map(l => [l.hip, l.knee, l.ankle]).concat([-pose.arm, pose.arm].map(angle => {
+      return [pose.far, pose.near].map(l => {
+        const x = SHOE.x + SHOE.w - 0.5, y = SHOE.y + SHOE.h * 0.65
+        const toe = [l.ankle[0] + x * Math.cos(l.tilt) - y * Math.sin(l.tilt), l.ankle[1] + x * Math.sin(l.tilt) + y * Math.cos(l.tilt)]
+        return [l.hip, l.knee, l.ankle, toe]
+      }).concat([-pose.arm, pose.arm].map(angle => {
         const a = armPose(shoulder, angle); return [a.shoulder, a.elbow, a.wrist]
       })).map(chain => chain.map(p => p.map((x, i) => (x + RUN_ORIGIN[i]) * 2)))
     }))
@@ -104,7 +108,7 @@ try {
   })
   const reviewHtml = study => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Runner rig review</title><style>
-body{background:#16121f;color:#eee8db;font:16px system-ui;margin:32px auto;max-width:1080px;padding:0 16px}button,input{accent-color:#ff6654}button{padding:8px 16px}main{display:flex;flex-wrap:wrap;gap:20px}canvas{width:300px;height:258px;image-rendering:pixelated;background:#292331}label{display:inline-block;margin:12px}p{color:#bfaecf}input[type=range]{width:280px}
+body{background:#16121f;color:#eee8db;font:16px system-ui;margin:32px auto;max-width:1080px;padding:0 16px}button,input{accent-color:#ff6654}button{padding:8px 16px}main{display:flex;flex-wrap:wrap;gap:20px}canvas{width:${study.outfits.length === 2 ? 430 : 300}px;height:auto;max-width:100%;image-rendering:pixelated;background:#292331}label{display:inline-block;margin:12px}p{color:#bfaecf}input[type=range]{width:280px}
 </style><h1>Runner rig review</h1><p>All 64 cached gameplay frames. Slow playback or scrub to check shoulder, knee and shoe registration.</p>
 <button id="play">Pause</button><label>Frame <input id="frame" type="range" min="0" max="63" value="0"><output id="number">0</output></label><label><input id="bones" type="checkbox"> Skeleton</label><label><input id="slow" type="checkbox" checked> Slow motion</label><main></main>
 <script>const study=${JSON.stringify(study)};
