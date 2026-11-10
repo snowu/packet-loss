@@ -8,6 +8,9 @@ import { HeistState, heistOptions, LOADOUTS, atThreat, threatScore } from '../sr
 import { ROUTES, STANDARD, rollRoutes, routeById } from '../src/sim/routes.js'
 import { CONTRACTS, rollContract, trackContract, contractDone } from '../src/sim/contracts.js'
 import { dailyHeist, dailyTrack } from '../src/sim/tracks.js'
+import { DEALS } from '../src/sim/deals.js'
+import { UNLOCKS, repFor } from '../src/sim/unlocks.js'
+import { stepPlayer } from '../src/sim/player.js'
 import { simulateHeist } from '../src/sim/heistSim.js'
 
 afterEach(() => setPhysMods({}))
@@ -132,7 +135,7 @@ describe('contracts', () => {
 
   it('times the seconds spent at speed and remembers the biggest combo', () => {
     const flow = { id: 'flow', avoid: false, target: 2, progress: 0, failed: false }
-    trackContract(flow, 'speed', 12, 5)
+    trackContract(flow, 'speed', 11, 5)
     expect(flow.progress).toBe(0)
     trackContract(flow, 'speed', 16, 1.5)
     expect(trackContract(flow, 'speed', 16, 1)).toBe(true)
@@ -293,4 +296,178 @@ describe('routed heists', () => {
     const late = (r) => Math.max(0, ...r.samples.filter((s) => s.sector === 3).map((s) => s.trace))
     expect(mean({ threat: 4 }, late)).toBeGreaterThan(mean({}, late) + 0.15)
   }, 300000)
+})
+
+describe('the fixer', () => {
+  it('sells only things that exist, and keeps them out of a heist until bought', () => {
+    for (const u of UNLOCKS) {
+      if (u.kind === 'chrome') expect(CHROME.find((c) => c.id === u.id)?.unlock, u.id).toBe(true)
+      if (u.kind === 'route') expect(ROUTES.find((r) => r.id === u.id)?.unlock, u.id).toBe(true)
+    }
+    const locked = (things) => things.filter((t) => t.unlock).map((t) => t.id).sort()
+    expect([...locked(CHROME), ...locked(ROUTES)].sort()).toEqual(UNLOCKS.filter((u) => u.kind !== 'perk').map((u) => u.id).sort())
+    const base = new HeistState(3), stocked = new HeistState(3, { unlocked: UNLOCKS.map((u) => u.id) })
+    const seen = (net) => {
+      const ids = new Set()
+      for (let i = 0; i < 80; i++) { net.openShop(); for (const c of net.offer) ids.add(c.id); for (const r of net.routeOffer) ids.add(r.id) }
+      return ids
+    }
+    const plain = seen(base), full = seen(stocked)
+    for (const id of ['shocksoles', 'glide', 'deadman', 'phase', 'blackout', 'goldrush']) {
+      expect(plain.has(id), id).toBe(false)
+      expect(full.has(id), id).toBe(true)
+    }
+    base.creds = 999
+    base.freePick = false
+    expect(base.install('phase')).toBe(false)
+  })
+
+  it('applies standing perks', () => {
+    const net = new HeistState(3, { unlocked: ['pockets', 'favor', 'medic'] })
+    expect(net.creds).toBe(60)
+    expect(net.repairCost).toBe(HEIST.REPAIR_COST - 30)
+    net.openShop()
+    expect(net.rerollCost).toBe(0)
+    net.reroll()
+    expect(net.rerollCost).toBe(HEIST.REROLL_COST)
+  })
+
+  it('pays rep for getting further, doing jobs and getting out', () => {
+    expect(repFor({ sector: 0, extracted: false, contracts: 0 })).toBe(0)
+    expect(repFor({ sector: 2, extracted: false, contracts: 1 })).toBe(25)
+    const out = repFor({ sector: 5, extracted: true, contracts: 3 })
+    expect(out).toBeGreaterThan(repFor({ sector: 4, extracted: false, contracts: 3 }) + 30)
+    expect(repFor({ sector: 5, extracted: true, contracts: 3, threat: 2 })).toBeGreaterThan(out)
+  })
+})
+
+describe('deals', () => {
+  const deal = (id) => ({ ...DEALS.find((d) => d.id === id), taken: false })
+
+  it('offers one at every uplink, good once', () => {
+    const net = new HeistState(6)
+    net.openShop()
+    expect(net.deal).not.toBeNull()
+    net.deal = deal('blood')
+    expect(net.takeDeal()).toBe(true)
+    expect([net.integrity, net.creds]).toEqual([HEIST.INTEGRITY - 1, 150])
+    expect(net.takeDeal()).toBe(false)
+  })
+
+  it('never takes the last point of integrity or creds you do not have', () => {
+    const net = new HeistState(6)
+    net.integrity = 1
+    net.deal = deal('blood')
+    expect(net.canDeal).toBe(false)
+    net.deal = deal('crate')
+    expect(net.canDeal).toBe(false)
+    net.creds = 50
+    const name = net.takeDeal()
+    expect(typeof name).toBe('string')
+    expect(net.owned).toHaveLength(1)
+    expect(net.creds).toBe(0)
+  })
+
+  it('scrubs the trace, burns it for creds, and triples the next contract', () => {
+    const net = new HeistState(6)
+    const level = new Level(6, heistOptions({ routed: true }))
+    level.ensure(FULL)
+    net.creds = 100
+    net.trace = 0.5
+    net.deal = deal('scrub')
+    net.takeDeal()
+    expect([net.trace, net.creds]).toEqual([0, 40])
+    net.deal = deal('burner')
+    net.takeDeal()
+    expect(net.trace).toBeCloseTo(0.3)
+    expect(net.creds).toBe(150)
+    net.deal = deal('tipoff')
+    net.takeDeal()
+    expect(net.startSector(level).pay).toBe(HEIST.CONTRACT_PAY * 3)
+    expect(net.startSector(level).pay).toBe(HEIST.CONTRACT_PAY)
+  })
+})
+
+describe('chrome that changes what you do', () => {
+  const laser = () => ({ id: 'L', x0: -1, x1: 1, y0: 0.05, y1: 0.27, low: true, tripped: false })
+  const withChrome = (ids) => {
+    const net = new HeistState(2, { unlocked: ids })
+    for (const id of ids) net.grant(id)
+    return net
+  }
+
+  it('shorts a laser grid out with a slide', () => {
+    const net = withChrome(['shocksoles'])
+    const chunk = { shards: [], lasers: [laser()], drones: [] }
+    const p = createPlayer(0, 0)
+    p.state = 'slide'
+    const events = []
+    net.step(0.01, p, { chunksIn: () => [chunk] }, events)
+    expect(events.map((e) => e.type)).toEqual(['short'])
+    expect(chunk.lasers).toHaveLength(0)
+    expect(net.creds).toBe(HEIST.SHORT_CREDS)
+    expect(net.stats.zaps).toBe(0)
+    // running into one still trips it
+    const again = { shards: [], lasers: [laser()], drones: [] }
+    p.state = 'run'
+    net.step(0.01, p, { chunksIn: () => [again] }, events)
+    expect(again.lasers[0].tripped).toBe(true)
+  })
+
+  it('hides you from security while Focus is on, with a Phase Shifter', () => {
+    const net = withChrome(['phase'])
+    const chunk = { shards: [], lasers: [laser()], drones: [{ id: 'D', x: -2, y: 2.75, down: false, spotted: false, passed: false }] }
+    const p = createPlayer(0, 0)
+    net.cloaked = true
+    const events = []
+    net.step(0.01, p, { chunksIn: () => [chunk] }, events)
+    expect(events).toEqual([])
+    expect(chunk.lasers[0].tripped).toBe(false)
+    expect(chunk.drones[0]).toMatchObject({ passed: true, spotted: false })
+    net.cloaked = false
+    net.step(0.01, p, { chunksIn: () => [chunk] }, events)
+    expect(chunk.lasers[0].tripped).toBe(true)
+  })
+
+  it('comes back once from a flatline with a Deadman Switch', () => {
+    const net = withChrome(['deadman'])
+    net.integrity = 1
+    expect(net.hurt()).toBe(1)
+    expect(net.notices).toEqual(['deadman'])
+    expect(net.hurt()).toBe(0)
+  })
+
+  it('glides while jump is held, and drops when it is let go', () => {
+    const level = { solidsIn: () => [], wallrunsIn: () => [], fencesIn: () => [], padsIn: () => [], ziplinesIn: () => [], roofAt: () => null, killY: () => -1000, lowestRoofAhead: () => -1000, chunksIn: () => [] }
+    const fall = (hold, glide) => {
+      const net = glide ? withChrome(['glide']) : new HeistState(2)
+      const p = createPlayer(0, 100)
+      p.state = 'air'
+      for (let i = 0; i < 240; i++) stepPlayer(p, { jump: hold, jumpPressed: false, down: false, downPressed: false }, PHYS.FIXED_DT, level, [])
+      net.dispose()
+      return 100 - p.y
+    }
+    const plain = fall(true, false)
+    expect(fall(true, true)).toBeLessThan(plain * 0.3)
+    expect(fall(false, true)).toBeCloseTo(fall(false, false))
+    expect(PHYS.GLIDE_FALL).toBe(0)
+  })
+})
+
+describe('sector par', () => {
+  it('sets the fast bonus from how long the sector really is, with slack for the standing start', () => {
+    const level = new Level(1000, heistOptions({ routed: true }))
+    level.ensure(FULL)
+    const net = new HeistState(1000)
+    net.startSector(level)
+    const length = level.checkpoints[0].x
+    expect(net.leg.par).toBeCloseTo(length / HEIST.FIRST_PAR_SPEED)
+    // the autopilot makes par in the first sector on every one of these cities
+    for (const seed of [1000, 8919, 16838]) expect(simulateHeist(seed).payouts[0].fast, seed).toBe(true)
+  }, 240000)
+
+  it('does not offer a quiet-trace job when the trace is already up', () => {
+    const rng = createRng(4)
+    for (let i = 0; i < 200; i++) expect(rollContract(rng, { shards: 30, drones: 5, lasers: 3 }, 50, 0.45).id).not.toBe('ghost')
+  })
 })

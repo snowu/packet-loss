@@ -9,6 +9,7 @@ import { bodyHeight, isGrounded } from './player.js'
 import { CHROME, chromeEffects, rollOffer, countOf } from './chrome.js'
 import { STANDARD, rollRoutes } from './routes.js'
 import { rollContract, trackContract, contractDone } from './contracts.js'
+import { rollDeal } from './deals.js'
 
 // Moves that jam the trace: the ones the city hands you. Slide jumps feed a
 // combo but can be repeated on any flat roof, so they don't jam.
@@ -91,15 +92,26 @@ export function heistOptions({ threat = 0, routed = false } = {}) {
 
 export class HeistState {
   // threat: 0 and up, each level hotter. loadout: a key of LOADOUTS.
-  constructor(seed, { threat = 0, loadout = 'courier' } = {}) {
+  // unlocked: ids bought from the fixer (see unlocks.js): chrome and routes
+  // marked `unlock` only turn up once theirs is here, and perks apply.
+  constructor(seed, { threat = 0, loadout = 'courier', unlocked = [] } = {}) {
     this.seed = seed >>> 0
     this.rng = createRng(this.seed ^ 0xc0ffee)
     this.jobs = createRng(this.seed ^ 0x10b5)   // contracts: their own rolls, so rerolls don't shift them
+    this.side = createRng(this.seed ^ 0xdea1)   // and the doc's side deals
+    this.unlocked = new Set(unlocked)
+    this.available = (thing) => !thing.unlock || this.unlocked.has(thing.id)
     this.threat = threat
     this.loadout = LOADOUTS[loadout] ?? LOADOUTS.courier
     this.sector = 0
     this.trace = 0
-    this.creds = this.loadout.creds ?? 0
+    this.creds = (this.loadout.creds ?? 0) + (this.unlocked.has('pockets') ? 60 : 0)
+    this.deal = null            // the doc's side offer at this uplink
+    this.freeReroll = false     // Fixer's Favor: the uplink's first reroll
+    this.contractBoost = 1      // a tip-off on the next contract
+    this.cloaked = false        // Focus is on (set by the game); matters with a Phase Shifter
+    this.revived = false
+    this.notices = []           // things the HUD should say, drained by the game
     this.owned = [...(this.loadout.chrome ?? [])]
     this.offer = []
     this.route = STANDARD       // the way across the current sector
@@ -110,7 +122,7 @@ export class HeistState {
     this.repairs = 0
     this.bought = 0             // chrome paid for this run
     this.freePick = false       // the free piece at the current uplink is still unclaimed
-    this.leg = { time: 0, dirty: false, falls: 0, burns: 0 }   // the sector being run
+    this.leg = { time: 0, dirty: false, falls: 0, burns: 0, par: HEIST.SECTOR_LEN / HEIST.FIRST_PAR_SPEED }   // the sector being run
     this.stats = { shards: 0, takedowns: 0, zaps: 0, spotted: 0, burns: 0, falls: 0, clean: 0, contracts: 0 }
     this.fx = chromeEffects(this.owned)
     setPhysMods(this.fx.phys)
@@ -120,8 +132,8 @@ export class HeistState {
 
   get integrityCap() { return Math.max(1, HEIST.INTEGRITY + this.fx.run.maxIntegrity + (this.loadout.integrity ?? 0)) }
   get mods() { return this.fx.run }
-  get repairCost() { return HEIST.REPAIR_COST + HEIST.REPAIR_STEP * this.repairs }
-  get rerollCost() { return this.mods.freeRerolls ? 0 : HEIST.REROLL_COST }
+  get repairCost() { return Math.max(20, HEIST.REPAIR_COST + HEIST.REPAIR_STEP * this.repairs - (this.unlocked.has('medic') ? 30 : 0)) }
+  get rerollCost() { return this.mods.freeRerolls || this.freeReroll ? 0 : HEIST.REROLL_COST }
   get canRepair() { return this.integrity < this.maxIntegrity && this.creds >= this.repairCost }
   get canReroll() { return this.creds >= this.rerollCost }
 
@@ -133,16 +145,27 @@ export class HeistState {
   }
 
   canInstall(c) {
-    return !!c && countOf(this.owned, c.id) < c.max && this.creds >= this.priceOf(c)
+    return !!c && this.available(c) && countOf(this.owned, c.id) < c.max && this.creds >= this.priceOf(c)
   }
 
   // ── street doc ──────────────────────────────────────────────────────────
 
   openShop() {
-    this.offer = rollOffer(this.rng, this.owned)
-    this.routeOffer = rollRoutes(this.rng)
+    this.offer = rollOffer(this.rng, this.owned, 3, this.available)
+    this.routeOffer = rollRoutes(this.rng, this.available)
+    this.deal = rollDeal(this.side)
     this.freePick = true
+    this.freeReroll = this.unlocked.has('favor')
     return this.offer
+  }
+
+  get canDeal() { return !!this.deal && !this.deal.taken && this.deal.can(this) }
+
+  // Take the doc's side deal. Returns what it gave, if it has a name.
+  takeDeal() {
+    if (!this.canDeal) return false
+    this.deal.taken = true
+    return this.deal.apply(this) ?? true
   }
 
   // Leave the uplink by one of the ways on offer: the sector ahead gets that
@@ -159,15 +182,21 @@ export class HeistState {
 
   // Roll the contract for the sector about to be run.
   startSector(level) {
-    this.contract = rollContract(this.jobs, level.sectorContents(this.sector), HEIST.CONTRACT_PAY)
+    this.contract = rollContract(this.jobs, level.sectorContents(this.sector), HEIST.CONTRACT_PAY * this.contractBoost, this.trace)
+    this.contractBoost = 1
     if (level.finish) this.exfilX = level.finish.x - HEIST.EXFIL_LEN
+    // par for the fast bonus, from how long this sector really is
+    const marks = [0, ...level.checkpoints.map((c) => c.x), level.finish?.x ?? Infinity]
+    const length = (marks[this.sector + 1] ?? Infinity) - marks[this.sector]
+    this.leg.par = (Number.isFinite(length) ? length : HEIST.SECTOR_LEN) / (this.sector === 0 ? HEIST.FIRST_PAR_SPEED : HEIST.SECTOR_PAR_SPEED)
     return this.contract
   }
 
   reroll() {
     if (!this.canReroll) return false
     this.creds -= this.rerollCost
-    this.offer = rollOffer(this.rng, this.owned)
+    this.freeReroll = false
+    this.offer = rollOffer(this.rng, this.owned, 3, this.available)
     return true
   }
 
@@ -189,6 +218,14 @@ export class HeistState {
       this.creds -= this.priceOf(c)
       this.bought++
     }
+    this.grant(id)
+    const i = this.offer.findIndex((o) => o?.id === id)
+    if (i >= 0) this.offer[i] = null
+    return true
+  }
+
+  // Bolt a piece on, however it was come by.
+  grant(id) {
     this.owned.push(id)
     this.fx = chromeEffects(this.owned)
     setPhysMods(this.fx.phys)
@@ -196,9 +233,6 @@ export class HeistState {
     if (max > this.maxIntegrity) this.integrity += max - this.maxIntegrity
     this.maxIntegrity = max
     this.integrity = Math.max(1, Math.min(this.integrity, max))
-    const i = this.offer.findIndex((o) => o?.id === id)
-    if (i >= 0) this.offer[i] = null
-    return true
   }
 
   // What the sector just run pays: bonuses for a clean and a fast one (as
@@ -206,7 +240,7 @@ export class HeistState {
   settle() {
     const leg = this.leg
     const clean = !leg.dirty && leg.falls === 0
-    const fast = leg.time <= HEIST.SECTOR_LEN / HEIST.SECTOR_PAR_SPEED
+    const fast = leg.time <= leg.par
     const k = this.route.payout
     const job = this.contract
     const done = contractDone(job)
@@ -217,8 +251,8 @@ export class HeistState {
     if (done) this.stats.contracts++
     this.creds += creds
     this.contract = null
-    this.leg = { time: 0, dirty: false, falls: 0, burns: 0 }
-    return { clean, fast, cleanPay, fastPay, creds, time: leg.time, contract, extra: this.mods.uplinkCreds }
+    this.leg = { time: 0, dirty: false, falls: 0, burns: 0, par: HEIST.SECTOR_LEN / HEIST.SECTOR_PAR_SPEED }
+    return { clean, fast, cleanPay, fastPay, creds, time: leg.time, par: leg.par, contract, extra: this.mods.uplinkCreds }
   }
 
   // Reached the uplink at the end of the current sector: the sector pays out,
@@ -258,6 +292,12 @@ export class HeistState {
 
   hurt() {
     this.integrity = Math.max(0, this.integrity - 1)
+    // Deadman Switch: once a run, a flatline doesn't take
+    if (this.integrity === 0 && this.mods.revive && !this.revived) {
+      this.revived = true
+      this.integrity = 1
+      this.notices.push('deadman')
+    }
     return this.integrity
   }
 
@@ -300,9 +340,18 @@ export class HeistState {
         this.trace = Math.max(0, this.trace - HEIST.TRACE_SHARD)
         events.push({ type: 'shard', x: s.x, y: s.y, focus: m.shardFocus })
       }
+      const unseen = m.phase && this.cloaked
       for (const l of c.lasers) {
-        if (l.tripped) continue
+        if (l.tripped || unseen) continue
         if (l.x1 < bx0 || l.x0 > bx1 || l.y1 < by0 || l.y0 > by1) continue
+        // Shock Soles: a slide shorts the grid out instead of tripping it
+        if (m.slideShorts && p.state === 'slide') {
+          c.lasers.splice(c.lasers.indexOf(l), 1)
+          this.creds += HEIST.SHORT_CREDS
+          this.trace = Math.max(0, this.trace - HEIST.TRACE_MOVE)
+          events.push({ type: 'short', x: p.x, y: (l.y0 + l.y1) / 2 })
+          break
+        }
         l.tripped = true
         this.leg.dirty = true
         this.stats.zaps++
@@ -329,7 +378,7 @@ export class HeistState {
           // judged once, as you go by: under the scanner you're seen,
           // clear over the top you're not
           d.passed = true
-          if (by0 < d.y + HEIST.DRONE_H) {
+          if (by0 < d.y + HEIST.DRONE_H && !unseen) {
             d.spotted = true
             this.leg.dirty = true
             this.stats.spotted++

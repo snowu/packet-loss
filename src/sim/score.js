@@ -6,12 +6,12 @@ import { PHYS } from './config.js'
 export const MOVE_POINTS = {
   vault: 100, clamber: 40, roll: 150, wallrun: 200, walljump: 150, zip: 120, zipjump: 80,
   spring: 80, padjump: 120, grab: 60, climb: 60, slide: 40, landslide: 150, slidejump: 120, jump: 10,
-  airjump: 70, shard: 25, takedown: 250,
+  airjump: 70, shard: 25, takedown: 250, short: 150,
 }
 export const MOVE_NAMES = {
   vault: 'VAULT', clamber: 'CLAMBER', roll: 'ROLL', wallrun: 'WALLRUN', walljump: 'WALL KICK', zip: 'ZIPLINE',
   zipjump: 'ZIP DROP', spring: 'LAUNCH', padjump: 'PAD JUMP', grab: 'LEDGE', climb: 'CLIMB', slide: 'SLIDE', landslide: 'LANDING SLIDE', slidejump: 'SLIDE JUMP',
-  airjump: 'AIR JUMP', takedown: 'TAKEDOWN',
+  airjump: 'AIR JUMP', takedown: 'TAKEDOWN', short: 'SHORT OUT',
 }
 const BREAKERS = new Set(['hardland', 'bonk', 'trip', 'shock'])
 const SUSTAINED = { wallrun: 60, zip: 40 }   // points per second while doing it

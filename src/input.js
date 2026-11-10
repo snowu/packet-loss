@@ -44,6 +44,7 @@ export class Input {
       if (e.code === 'KeyQ') this.handlers.runner?.(-1)
       if (e.code === 'KeyE') this.handlers.runner?.(1)
       if (e.code === 'KeyT') this.handlers.threat?.()
+      if (e.code === 'KeyF') this.handlers.fixer?.()
       if (e.code === 'Space') this.handlers.confirm?.()
       if (e.code === 'Enter') this.handlers.enter?.()
       if (e.code === 'KeyR') this.handlers.restart?.()

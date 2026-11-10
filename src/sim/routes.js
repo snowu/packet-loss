@@ -20,6 +20,9 @@ export const ROUTES = [
   route({ id: 'sweep', name: 'Drone Sweep', desc: 'Twice the drones. Takedowns pay ¢10.', drone: 1.8, takedownCreds: 10, heat: 1 }),
   route({ id: 'vault', name: 'Data Vault', desc: 'A shard on every obstacle and more lines. Trace builds 35% faster.', shards: 2.2, trace: 1.35, heat: 1 }),
   route({ id: 'redline', name: 'Red Line', desc: 'Heavy security everywhere. Sector bonuses pay triple.', laser: 1.6, drone: 1.5, trace: 1.2, payout: 3, heat: 2 }),
+  // unlocked from the fixer (see unlocks.js)
+  route({ id: 'blackout', name: 'Blackout', desc: 'No lasers, no drones. Trace builds 70% faster.', laser: 0, drone: 0, trace: 1.7, heat: 1, unlock: true }),
+  route({ id: 'goldrush', name: 'Gold Rush', desc: 'Shards are worth triple. Heavy security, no sector bonuses.', laser: 1.5, drone: 1.4, shardValue: 3, payout: 0, heat: 2, unlock: true }),
 ]
 
 export function routeById(id) {
@@ -27,9 +30,11 @@ export function routeById(id) {
 }
 
 // Two ways on: never two easy ones, so there is always a reason to push.
-export function rollRoutes(rng) {
-  const first = rng.pick(ROUTES)
-  const rest = ROUTES.filter((r) => r !== first && (first.heat > 0 || r.heat > 0))
+// available: which routes are open (the fixer's unlocks); all by default.
+export function rollRoutes(rng, available = () => true) {
+  const open = ROUTES.filter(available)
+  const first = rng.pick(open)
+  const rest = open.filter((r) => r !== first && (first.heat > 0 || r.heat > 0))
   const second = rng.pick(rest)
   return first.heat <= second.heat ? [first, second] : [second, first]
 }

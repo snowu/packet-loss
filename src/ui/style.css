@@ -393,6 +393,20 @@ body.pixel .banner { color: #eef6ff; text-shadow: -2px 0 var(--pink), 2px 0 var(
 .unlock-note.perk { color: #5dff8a; }
 .best-line .unlocked { margin-top: 6px; color: #ffe14d; }
 #threat-pick.locked { display: none; }
+.action.deal { color: #ffe14d; box-shadow: 0 4px 0 #05040d, inset 0 0 0 2px rgba(255, 225, 77, 0.45); }
+.action.deal.taken { text-decoration: line-through; }
+.city-pick button.wide { width: auto; padding: 0 8px; font: 400 10px/1 'Silkscreen', monospace; }
+.fixer-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; max-height: 52vh; overflow-y: auto; }
+.fixer-list li { display: flex; flex-direction: column; gap: 5px; padding: 9px 10px; cursor: pointer; background: rgba(41, 243, 255, 0.06); box-shadow: inset 0 0 0 2px rgba(41, 243, 255, 0.25); }
+.fixer-list li.sel { background: rgba(41, 243, 255, 0.16); box-shadow: inset 0 0 0 2px var(--cyan); }
+.fixer-list li.off { opacity: 0.55; }
+.fixer-list li.owned { cursor: default; box-shadow: inset 0 0 0 2px rgba(93, 255, 138, 0.45); }
+.fixer-list .f-kind { font: 400 9px/1 'Silkscreen', monospace; letter-spacing: 0.06em; color: #8fa0c8; display: flex; justify-content: space-between; }
+.fixer-list .f-kind b { color: #ffe14d; font-weight: 400; }
+.fixer-list li.owned .f-kind b { color: #5dff8a; }
+.fixer-list .f-name { font: 700 16px/1.05 'Pixelify Sans', monospace; color: #eef6ff; }
+.fixer-list .f-desc { font: 400 12px/1.2 'Pixelify Sans', monospace; color: #c8d4ee; }
+.best-line .rep { margin-top: 6px; color: #5dff8a; }
 .shop-actions { margin-top: 12px; }
 .action.sel { box-shadow: 0 4px 0 #05040d, inset 0 0 0 2px var(--cyan), 0 0 14px rgba(41, 243, 255, 0.45); }
 .action.off { opacity: 0.45; }

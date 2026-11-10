@@ -21,6 +21,7 @@ export const PHYS = {
   MAX_FALL: 40,
   AIR_JUMPS: 0,         // mid-air jumps per airtime (chrome can add one)
   AIR_JUMP_V: 10,
+  GLIDE_FALL: 0,        // holding jump caps the fall at this speed (chrome; 0 is off)
 
   // running speed
   SPEED_START: 7,
@@ -132,8 +133,10 @@ export const HEIST = {
   CHROME_COST_STEP: 25,
   // sector payouts at the uplink
   CLEAN_BONUS: 40,       // no laser tripped, never spotted or burned, no fall
-  FAST_BONUS: 25,        // through the sector at SECTOR_PAR_SPEED or better
-  SECTOR_PAR_SPEED: 13.5,
+  FAST_BONUS: 25,        // through the sector at its par pace or better
+  SECTOR_PAR_SPEED: 12.5,  // m/s over the sector's own length
+  FIRST_PAR_SPEED: 11,   // the first sector starts from a standstill
+  SHORT_CREDS: 10,       // for a laser grid shorted out with Shock Soles
   CONTRACT_PAY: 50,
   // exfil: over the last stretch before the finish the trace climbs hard,
   // and only moves hold it back

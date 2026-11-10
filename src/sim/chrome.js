@@ -38,6 +38,16 @@ export const CHROME = [
     desc: 'Shards are worth triple. Trace builds 30% faster.' },
   { id: 'overdrive', short: 'OVERDRV', name: 'Overdrive Core', maker: 'PULSE', tag: 'HEART', deal: true, rare: true, max: 1,
     desc: '+7 km/h top speed and clean moves jam twice the trace. −1 max integrity.' },
+  // unlocked from the fixer between heists (see unlocks.js): these change
+  // what you do on a roof, not how well you do it
+  { id: 'shocksoles', short: 'SOLES', name: 'Shock Soles', maker: 'KITE', tag: 'LEGS', unlock: true, max: 1,
+    desc: 'Slide through a laser grid to short it out: no alarm, and it pays.' },
+  { id: 'glide', short: 'GLIDE', name: 'Glide Fins', maker: 'HELIX', tag: 'ARMS', unlock: true, max: 1,
+    desc: 'Hold jump in the air to glide. Let go to drop.' },
+  { id: 'deadman', short: 'DEADMAN', name: 'Deadman Switch', maker: 'NOVA', tag: 'HEART', unlock: true, rare: true, max: 1,
+    desc: 'Once a run, a flatline leaves you with one integrity instead.' },
+  { id: 'phase', short: 'PHASE', name: 'Phase Shifter', maker: 'ORBIT', tag: 'EYES', unlock: true, rare: true, max: 1,
+    desc: 'While Focus is on, lasers and drones can’t see you.' },
 ]
 
 // Maker sets: two pieces from one maker (stacks count) switch on a bonus.
@@ -75,8 +85,9 @@ export function countOf(owned, id) {
 }
 
 // Up to n distinct offers that the runner can still install.
-export function rollOffer(rng, owned, n = 3) {
-  const pool = CHROME.filter((c) => countOf(owned, c.id) < c.max).map((c) => [c, c.rare ? 1 : 3])
+// available: which pieces are in stock (the fixer's unlocks); all by default.
+export function rollOffer(rng, owned, n = 3, available = () => true) {
+  const pool = CHROME.filter((c) => available(c) && countOf(owned, c.id) < c.max).map((c) => [c, c.rare ? 1 : 3])
   const out = []
   while (out.length < n && pool.length) {
     const pick = rng.weighted(pool)
@@ -98,6 +109,7 @@ export function chromeEffects(owned) {
   if (set('STRATA')) phys.STUMBLE_TIME = (v) => v * 0.5
   if (set('HELIX')) phys.MANTLE_KEEP = () => 1
   if (n('tendons')) phys.AIR_JUMPS = (v) => v + n('tendons')
+  if (n('glide')) phys.GLIDE_FALL = () => 5
   if (n('calves') || n('overdrive')) {
     phys.SPEED_MAX = (v) => v + 1.1 * n('calves') + 1.9 * n('overdrive')
     phys.ACCEL = (v) => v * (1 + 0.25 * n('calves'))
@@ -127,6 +139,9 @@ export function chromeEffects(owned) {
     takedownSpeed: 1.4 * n('adrenal'),
     takedownFocus: 0.15 * n('adrenal'),
     freeFalls: n('secondwind'),
+    slideShorts: n('shocksoles') > 0,
+    revive: n('deadman') > 0,
+    phase: n('phase') > 0,
     // maker sets
     flowHide: set('VOLT') ? 0.4 : 0,
     quietStumbles: set('STRATA'),
