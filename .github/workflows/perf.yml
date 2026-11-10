@@ -11,6 +11,33 @@ permissions:
   contents: read
 
 jobs:
+  art-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: npm run build
+      - name: Capture matching base and proposed game frames
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add ../art-base "$BASE_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" ../art-base/node_modules
+          node bench/art-review.js --root=../art-base --tag=before
+          node bench/art-review.js --tag=after
+      - uses: actions/upload-artifact@v4
+        with:
+          name: art-review
+          path: docs/screenshots/courier-pass/*.png
   bench:
     runs-on: ubuntu-latest
     steps:

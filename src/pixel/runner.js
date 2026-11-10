@@ -48,10 +48,11 @@ export const RUNNER_STYLES = {
     ponytail: { n: 4, seg: 1.9, r0: 1.15, r1: 0.79, grav: 1, damp: 0.93 }, cloth: [],
   },
   courier: {
-    name: 'Courier', scale: 1.18, thick: 0.92, head: 1, shade: 0.28, fps: 30, face: true,
+    name: 'Courier', scale: 1.18, thick: 0.92, head: 1, shade: 0.34, fps: 30, face: true, worn: true,
     colors: palette({
-      top: hex(0xeeebf4), pants: hex(0x2a2440), pantsFar: hex(0x1c1830), shoe: hex(0xff3b30),
+      top: hex(0xd4cfc5), pants: hex(0x302b40), pantsFar: hex(0x1c1830), shoe: hex(0xff3b30),
       glove: hex(0xff3b30), band: hex(0xff3b30), hair: hex(0x1d1214), skin: hex(0xe9a882),
+      patch: hex(0x675b60), belt: hex(0x171520), seam: hex(0x9b938b), sole: hex(0xc4bdb1),
     }),
     sleeveless: true,
     ponytail: { n: 5, seg: 1.7, r0: 1.05, r1: 0.45, grav: 0.28, damp: 0.91 },
@@ -546,6 +547,17 @@ export class RunnerSprite {
     seg(lerp(j.shoulder, j.elbowA, 0.55), lerp(j.shoulder, j.elbowA, 0.6), graceful ? 1 : 1.2, C.band)
     seg(j.elbowA, j.handA, graceful ? 0.8 : 1.0, sleeve ?? C.skin)
     hand(j.handA, j.elbowA, false)
+    if (st.worn) {
+      // Details are posed with the same skeleton as the body. No screen-space
+      // noise: patches and seams stay attached through vaults and rolls.
+      seg(lerp(j.pelvis, j.shoulder, 0.24), lerp(j.pelvis, j.shoulder, 0.65), 0.32, C.seam)
+      seg(j.pelvis, j.pelvis, 1.65, C.belt)
+      const pouch = [j.pelvis[0] - 1.7 * st.scale, j.pelvis[1] - 0.8 * st.scale]
+      seg(pouch, [pouch[0], pouch[1] - 1.3 * st.scale], 0.85, C.patch)
+      seg(lerp(j.pelvis, j.kneeA, 0.88), lerp(j.kneeA, j.ankleA, 0.12), 0.95, C.patch)
+      seg(lerp(j.kneeA, j.ankleA, 0.84), lerp(j.kneeA, j.ankleA, 0.9), 1.1, C.patch)
+      seg(lerp(j.ankleA, j.toeA, 0.65), j.toeA, 0.35, C.sole)
+    }
     if (graceful) seg(j.hairRoot, j.hairRoot, 0.6, C.band)
     return out
   }
@@ -691,6 +703,7 @@ export class RunnerSprite {
       }
       const skin = st.colors.skin
       detail(1.1, 1.3, st.colors.hair) // brow
+      if (st.worn) detail(0.4, 1.5, st.colors.hair) // heavier, intent brow
       detail(1.3, 0.6, COLORS.outline) // eye
       detail(1.1, -0.7, mix(skin, [255, 222, 191], 0.28)) // cheek
       detail(1.5, -1.55, mix(skin, st.colors.skinFar, 0.7)) // mouth and jaw

@@ -56,6 +56,15 @@ function droneArt(frame, alarm) {
   // scanner under the belly
   b.rect(10, 8, 3, 1, dark)
   b.set(11, 9, pack(eye))
+  // Armoured side pods, panel seams and a faceted underside lens. Same
+  // 25×12 canvas and scanner origin, so scans and takedowns still line up.
+  b.rect(1, 3, 4, 2, dark); b.rect(18, 3, 4, 2, dark)
+  b.rect(1, 3, 3, 1, hl); b.rect(18, 3, 3, 1, hl)
+  b.set(2, 4, pack(eye)); b.set(20, 4, pack(eye))
+  b.rect(9, 3, 5, 1, hl)
+  b.set(10, 3, base); b.set(14, 4, ink)
+  b.rect(9, 7, 5, 2, ink)
+  b.rect(10, 8, 3, 1, pack(eye)); b.set(11, 8, pack([255, 245, 250]))
   return outlined(b, ink)
 }
 for (const alarm of [false, true]) for (const f of [0, 1]) defineArt(`drone${alarm ? '_alarm' : ''}_${f}`, 'security', () => droneArt(f, alarm))
