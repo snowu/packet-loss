@@ -12,7 +12,7 @@ thigh and shin lengths constant, bends knees forwards and supplies heel recovery
 The far limbs have a darker treatment and arms counter-swing. Existing traversal
 poses remain in use outside running; ghosts use their own distance-driven gait.
 
-A full left/right stride covers 4.2 world metres. Stance lasts 36% of a cycle;
+A full left/right stride covers 4.2 world metres. Stance lasts 24% of a cycle;
 the planted ankle travels backwards by the exact ground distance. The renderer
 advances phase from interpolated player position and triggers footstep audio at
 the same half-stride contacts. It does not advance during pause, idle or flight,
@@ -29,8 +29,13 @@ cover sole clearance, constant bone lengths and continuity at recovery keys.
 
 The shoulder is registered to the painted torso and follows its hip transform
 and lean, rather than using an independent position. Elbow, wrist and knee
-landmarks are registered inside the cutouts; hands remain above and ahead of
-the elbows during the arm pump. Heel strike and toe-off rotate around the
+landmarks are registered inside the cutouts. Flexed arms move from waist to
+chest and counter the thigh drive, rather than lagging it by a quarter cycle.
+The pelvis compresses after contact and rises through push-off and flight;
+the foot strikes closer under the body, then folds behind the pelvis before
+the knee drives forward. The shin owns the kneecap: the duplicate pad at the
+end of the thigh cutout is clipped. Far limbs have stronger depth shading.
+Heel strike and toe-off rotate around the
 sole contact, with matching ankle and shoe-angle velocities into recovery.
 
 ## Review
@@ -41,11 +46,18 @@ sole contact, with matching ankle and shoe-angle velocities into recovery.
 is self-contained and can be opened directly in a browser. It shows all 64
 cached frames for all three outfits, at slow or gameplay speed.
 
+[Synchronized comparison against the previous PR stride](screenshots/gait/stride-comparison.html)
+shows both cycles at the same phase, with optional skeleton overlays.
+
+![Previous PR stride above, reworked stride below](screenshots/gait/stride-before-after.png)
+
 [Actual gameplay recording with live game audio](screenshots/gait/gameplay-with-audio.webm)
 
 `node bench/gait-review.js` checks the actual game's audio callbacks against its
 rendered gait across all three outfits, focus and pause, and writes the stride
-sheet and animated review. `--record` also records ten seconds of actual gameplay with Web Audio
+sheet and animated review. `--compare=f742886` also generates the synchronized
+before/after review and sheet from that commit's cached review frames.
+`--record` also records ten seconds of actual gameplay with Web Audio
 mixed into the canvas recording (WebM). `tests/runGait.test.js` checks speed/draw-rate independence, contact
 alternation, focus, transitions, teleport reset, stance registration and bone
 lengths across the cycle. CI runs both the unit and browser checks.

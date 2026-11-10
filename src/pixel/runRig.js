@@ -16,9 +16,10 @@ export function shoulderAt(pose, aspect) {
 
 export function armPose(shoulder, angle) {
   const elbow = [shoulder[0] + Math.sin(angle) * 5.7, shoulder[1] + Math.cos(angle) * 5.7]
-  // Keep the hand in front of and above the elbow throughout the pump. The
-  // forearm's absolute angle follows the upper arm with a smaller amplitude.
-  const fore = 2.05 + angle * 0.45
+  // A flexed elbow follows the upper arm. At the back of the pump the hand
+  // passes the waist; at the front it rises toward the chest. Holding both
+  // hands above the elbows pinned the arms into the same cramped silhouette.
+  const fore = 1.65 + angle * 0.85
   const wrist = [elbow[0] + Math.sin(fore) * 4.4, elbow[1] + Math.cos(fore) * 4.4]
   return { shoulder, elbow, wrist }
 }
@@ -31,6 +32,11 @@ function bone(ctx, image, id, from, to) {
   // turned the baggy cutouts into oversized overlapping knee/ankle lumps.
   const sourceAngle = Math.atan2(b[1] - a[1], b[0] - a[0])
   ctx.save(); ctx.translate(...from); ctx.rotate(angle + sourceAngle)
+  if (id === 3) {
+    // The shin owns the kneecap. Hide the thigh kit's second kneepad before
+    // layering the shin, rather than piling two complete pads on one joint.
+    ctx.beginPath(); ctx.rect(-8, -12, Math.hypot(to[0] - from[0], to[1] - from[1]) + 7, 24); ctx.clip()
+  }
   ctx.scale(scale, scale * (id >= 3 ? 0.72 : 1)); ctx.rotate(-sourceAngle)
   ctx.drawImage(image, -a[0], -a[1]); ctx.restore()
 }
@@ -56,7 +62,7 @@ export function bakeRunFrames(parts) {
   const far = parts.map(image => {
     const cv = document.createElement('canvas'); cv.width = image.width; cv.height = image.height
     const ctx = cv.getContext('2d'); ctx.drawImage(image, 0, 0)
-    ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = '#120d2c55'; ctx.fillRect(0, 0, cv.width, cv.height)
+    ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = '#120d2c88'; ctx.fillRect(0, 0, cv.width, cv.height)
     return cv
   })
   return Array.from({ length: RUN_FRAMES }, (_, i) => {

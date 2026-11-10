@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { RunGait, RUN_STRIDE, STANCE, SHOE, runFrame, runPose } from '../src/pixel/runGait.js'
+import { RunGait, RUN_STRIDE, STANCE, CONTACT_X, RECOVERY_KEYS, SHOE, runFrame, runPose } from '../src/pixel/runGait.js'
 import { armPose, shoulderAt, TORSO } from '../src/pixel/runRig.js'
 
 const runner = speed => ({ state: 'run', speed })
@@ -51,7 +51,7 @@ describe('distance-driven run gait', () => {
     gait.reset(); expect(gait.phase).toBe(0)
   })
 
-  it('plants each ankle in world space and keeps anatomical bone lengths through the full cycle', () => {
+  it('plants each sole in world space and keeps anatomical bone lengths through the full cycle', () => {
     for (let i = 0; i < 1000; i++) {
       const phase = i / 1000, pose = runPose(phase)
       for (const [key, offset] of [['near', 0], ['far', 0.5]]) {
@@ -65,7 +65,7 @@ describe('distance-driven run gait', () => {
           expect(Math.max(...soles)).toBeCloseTo(0, 8)
           const pivot = leg.tilt < 0 ? SHOE.x : SHOE.x + SHOE.w
           const contactX = leg.ankle[0] + pivot * Math.cos(leg.tilt) - (SHOE.y + SHOE.h) * Math.sin(leg.tilt)
-          expect(contactX + u * RUN_STRIDE * 14).toBeCloseTo(RUN_STRIDE * 14 * STANCE / 2 + pivot, 8)
+          expect(contactX + u * RUN_STRIDE * 14).toBeCloseTo(CONTACT_X + pivot, 8)
         }
       }
     }
@@ -74,7 +74,7 @@ describe('distance-driven run gait', () => {
 
   it('recovers continuously without stopping at swing keys or snapping at contact', () => {
     const eps = 1e-6
-    for (const t of [STANCE, 0.51, 0.69, 0.86, 1]) {
+    for (const t of RECOVERY_KEYS) {
       const before = runPose(t - eps).near, after = runPose(t + eps).near
       expect(Math.hypot(after.ankle[0] - before.ankle[0], after.ankle[1] - before.ankle[1])).toBeLessThan(0.001)
       expect(Math.abs(after.tilt - before.tilt)).toBeLessThan(0.001)
@@ -86,7 +86,7 @@ describe('distance-driven run gait', () => {
     }
   })
 
-  it('binds shoulders to the leaning torso and keeps hands forward and elbows flexed', () => {
+  it('binds shoulders to the leaning torso and keeps elbows flexed through the pump', () => {
     for (const aspect of [421 / 490, 422 / 490, 426 / 493]) for (let i = 0; i < 64; i++) {
       const pose = runPose(i / 64), shoulder = shoulderAt(pose, aspect)
       const dx = shoulder[0] - pose.hip[0], dy = shoulder[1] - pose.hip[1]
@@ -98,8 +98,25 @@ describe('distance-driven run gait', () => {
         expect(Math.hypot(elbow[0] - shoulder[0], elbow[1] - shoulder[1])).toBeCloseTo(5.7, 10)
         expect(Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1])).toBeCloseTo(4.4, 10)
         expect(wrist[0]).toBeGreaterThan(elbow[0])
-        expect(wrist[1]).toBeLessThan(elbow[1])
+        const flex = Math.atan2(wrist[0] - elbow[0], wrist[1] - elbow[1]) - angle
+        expect(flex).toBeGreaterThan(1.4)
+        expect(flex).toBeLessThan(1.9)
       }
     }
+  })
+
+  it('compresses after contact and counters the knee drive with the opposite arm', () => {
+    expect(runPose(0.11).hip[1]).toBeGreaterThan(runPose(0).hip[1])
+    expect(runPose(0.36).hip[1]).toBeLessThan(runPose(0).hip[1])
+    // Contact lands under the forward knee; no locked-out reaching leg.
+    const contact = runPose(0).near
+    expect(contact.ankle[0]).toBeLessThan(6)
+    expect(Math.abs(contact.knee[0] - contact.ankle[0])).toBeLessThan(3)
+    // Heel folds up behind the pelvis before the knee drives through.
+    expect(runPose(0.43).near.ankle[1]).toBeLessThan(-15)
+    expect(runPose(0.43).near.ankle[0]).toBeLessThan(-6)
+    expect(runPose(0.64).near.knee[0]).toBeGreaterThan(7)
+    expect(runPose(0.64).arm).toBeLessThan(0)
+    expect(runPose(0.14).arm).toBeGreaterThan(0)
   })
 })

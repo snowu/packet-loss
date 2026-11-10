@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { chromium } from 'playwright'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { setTimeout as pause } from 'node:timers/promises'
 
 const output = 'docs/screenshots/gait'
@@ -101,7 +102,7 @@ try {
     }))
     return { atlas: cv.toDataURL(), skeletons, outfits }
   })
-  writeFileSync(`${output}/run-cycle.html`, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+  const reviewHtml = study => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Runner rig review</title><style>
 body{background:#16121f;color:#eee8db;font:16px system-ui;margin:32px auto;max-width:1080px;padding:0 16px}button,input{accent-color:#ff6654}button{padding:8px 16px}main{display:flex;flex-wrap:wrap;gap:20px}canvas{width:300px;height:258px;image-rendering:pixelated;background:#292331}label{display:inline-block;margin:12px}p{color:#bfaecf}input[type=range]{width:280px}
 </style><h1>Runner rig review</h1><p>All 64 cached gameplay frames. Slow playback or scrub to check shoulder, knee and shoe registration.</p>
@@ -113,7 +114,32 @@ const contexts=study.outfits.map(name=>{const box=document.createElement('sectio
 function draw(){const frame=Math.floor(phase)%64;slider.value=frame;document.getElementById('number').value=frame;contexts.forEach((c,row)=>{c.clearRect(0,0,112,96);c.strokeStyle='#7a6a83';c.lineWidth=.5;c.beginPath();c.moveTo(0,90);c.lineTo(112,90);c.stroke();c.drawImage(image,frame*112,row*96,112,96,0,0,112,96);if(bones.checked)study.skeletons[row][frame].forEach((chain,i)=>{c.strokeStyle=i%2?'#ffcf66':'#55ddeb';c.lineWidth=.6;c.beginPath();chain.forEach((p,j)=>j?c.lineTo(...p):c.moveTo(...p));c.stroke();chain.forEach(p=>{c.beginPath();c.arc(...p,1,0,Math.PI*2);c.fillStyle=c.strokeStyle;c.fill()})})})}
 play.onclick=()=>{running=!running;play.textContent=running?'Pause':'Play'};slider.oninput=()=>{running=false;play.textContent='Play';phase=Number(slider.value);draw()};bones.onchange=draw;
 function tick(now){if(last&&running)phase=(phase+Math.min(now-last,100)/1000*64*(slow.checked?.6:2.8))%64;last=now;if(image.complete)draw();requestAnimationFrame(tick)}requestAnimationFrame(tick);
-</script>`)
+</script>`
+  writeFileSync(`${output}/run-cycle.html`, reviewHtml(study))
+  const compare = process.argv.find(arg => arg.startsWith('--compare='))?.slice('--compare='.length)
+  if (compare) {
+    const previousHtml = execFileSync('git', ['show', `${compare}:${output}/run-cycle.html`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 })
+    const previous = JSON.parse(previousHtml.match(/const study=(.*);\nconst image=/)[1])
+    const comparison = await page.evaluate(async ({ previous, current }) => {
+      const images = await Promise.all([previous, current].map(s => new Promise(resolve => {
+        const im = new Image(); im.onload = () => resolve(im); im.src = s.atlas
+      })))
+      const cv = document.createElement('canvas'); cv.width = 112 * 64; cv.height = 192
+      const c = cv.getContext('2d')
+      images.forEach((im, row) => c.drawImage(im, 0, 0, im.width, 96, 0, row * 96, im.width, 96))
+      const sheet = document.createElement('canvas'); sheet.width = 1440; sheet.height = 500
+      const sc = sheet.getContext('2d'); sc.fillStyle = '#16121f'; sc.fillRect(0, 0, 1440, 500)
+      const labels = ['Previous PR stride', 'Reworked stride']
+      images.forEach((im, row) => {
+        sc.fillStyle = '#eee8db'; sc.font = 'bold 24px monospace'; sc.fillText(labels[row], 30, 35 + row * 240)
+        for (let col = 0; col < 8; col++) sc.drawImage(im, col * 8 * 112, 0, 112, 96, 8 + col * 178, 55 + row * 240, 168, 144)
+      })
+      return { atlas: cv.toDataURL(), skeletons: [previous.skeletons[0], current.skeletons[0]], outfits: labels, sheet: sheet.toDataURL().split(',')[1] }
+    }, { previous, current: study })
+    writeFileSync(`${output}/stride-before-after.png`, Buffer.from(comparison.sheet, 'base64'))
+    delete comparison.sheet
+    writeFileSync(`${output}/stride-comparison.html`, reviewHtml(comparison))
+  }
   assert.deepEqual(errors, [])
   console.log('Gait/audio browser check:', JSON.stringify(report))
   await page.close()

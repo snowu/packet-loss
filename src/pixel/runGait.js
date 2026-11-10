@@ -4,7 +4,13 @@ import { PPU } from './sprites.js'
 // advances the feet, so focus, changing speed and skipped draws cannot slip.
 export const RUN_STRIDE = 4.2
 export const RUN_FRAMES = 64
-export const STANCE = 0.36
+export const STANCE = 0.24
+export const CONTACT_X = 5
+const STRIKE_TILT = -0.08
+const PUSH_TILT = 0.38
+const FLAT_AT = 0.08
+const ROLL_AT = 0.18
+export const RECOVERY_KEYS = [STANCE, 0.43, 0.64, 0.83, 1]
 const TAU = Math.PI * 2
 const wrap = x => ((x % 1) + 1) % 1
 
@@ -25,20 +31,22 @@ function swing(u, reach) {
   // Hermite tangents are in pixels per cycle. Match ground velocity at both
   // ends; easing every segment to a stop made the recovering feet hitch.
   const speed = -RUN_STRIDE * PPU
-  const start = plantedAnkle(-reach, 0.45), end = plantedAnkle(reach, -0.16)
+  const start = plantedAnkle(reach - RUN_STRIDE * PPU * STANCE, PUSH_TILT), end = plantedAnkle(reach, STRIKE_TILT)
   // Toe roll is still moving at lift-off; heel roll is moving at strike.
   const velocity = (tilt, rate, pivot) => [
     speed + (pivot * Math.sin(tilt) + (SHOE.y + SHOE.h) * Math.cos(tilt)) * rate,
     ((SHOE.y + SHOE.h) * Math.sin(tilt) - pivot * Math.cos(tilt)) * rate,
   ]
-  const out = velocity(0.45, 0.9 / (STANCE - 0.25), SHOE.x + SHOE.w)
-  const into = velocity(-0.16, 1.6, SHOE.x)
+  const rollRate = 2 * PUSH_TILT / (STANCE - ROLL_AT)
+  const strikeRate = -STRIKE_TILT / FLAT_AT
+  const out = velocity(PUSH_TILT, rollRate, SHOE.x + SHOE.w)
+  const into = velocity(STRIKE_TILT, strikeRate, SHOE.x)
   const keys = [
-    [STANCE, ...start, 0.45, ...out, 0.9 / (STANCE - 0.25)],
-    [0.51, -11, -11, 0.85, 55, -40, -1],
-    [0.69, 0, -13, 0.1, 75, 15, -4],
-    [0.86, 11, -7, -0.35, 30, 42, 0],
-    [1, ...end, -0.16, ...into, 1.6],
+    [STANCE, ...start, PUSH_TILT, ...out, rollRate],
+    [0.43, -8, -16, 0.8, 42, -8, -1],
+    [0.64, -0.5, -12.5, 0.1, 50, 25, -3],
+    [0.83, 5, -8, -0.18, 10, 30, 0],
+    [1, ...end, STRIKE_TILT, ...into, strikeRate],
   ]
   const i = Math.min(3, keys.findIndex((k, i) => i < 4 && u < keys[i + 1][0]))
   const a = keys[i], b = keys[i + 1], span = b[0] - a[0], t = (u - a[0]) / span
@@ -79,14 +87,16 @@ export function kneeBetween(hip, ankle, thigh = 9.6, shin = 9.5) {
 }
 
 export function runPose(phase) {
-  const t = wrap(phase), hip = [0, -18.8 + 0.6 * Math.cos(t * TAU * 2)]
+  // Compression follows contact; extension and flight follow push-off. The
+  // old low, almost stationary pelvis forced a squat through the whole run.
+  const t = wrap(phase), hip = [0, -21.4 + 1.2 * Math.cos((t - 0.11) * TAU * 2)]
   const leg = offset => {
-    const u = wrap(t + offset), reach = RUN_STRIDE * PPU * STANCE / 2
+    const u = wrap(t + offset), reach = CONTACT_X
     let ankle, tilt
     if (u < STANCE) {
       // Moving backwards by exactly the world distance travelled keeps the
       // sole planted on the roof until toe-off.
-      tilt = u < 0.10 ? -0.16 * (1 - u / 0.10) : u > 0.25 ? 0.45 * ((u - 0.25) / (STANCE - 0.25)) ** 2 : 0
+      tilt = u < FLAT_AT ? STRIKE_TILT * (1 - u / FLAT_AT) : u > ROLL_AT ? PUSH_TILT * ((u - ROLL_AT) / (STANCE - ROLL_AT)) ** 2 : 0
       ankle = plantedAnkle(reach - RUN_STRIDE * PPU * u, tilt)
     } else {
       const recovery = swing(u, reach)
@@ -95,7 +105,9 @@ export function runPose(phase) {
     }
     return { hip, knee: kneeBetween(hip, ankle), ankle, tilt, planted: u < STANCE }
   }
-  return { hip, near: leg(0), far: leg(0.5), arm: -0.75 * Math.cos(t * TAU), lean: 0.16 + 0.025 * Math.sin(t * TAU * 2) }
+  // Counter the thigh drive, which peaks before contact, rather than the
+  // ankle contact clock. The old arms lagged the legs by a quarter cycle.
+  return { hip, near: leg(0), far: leg(0.5), arm: 0.95 * Math.sin(t * TAU - 0.55), lean: 0.19 }
 }
 
 export const runFrame = phase => Math.floor(wrap(phase) * RUN_FRAMES) % RUN_FRAMES
