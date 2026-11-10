@@ -5,10 +5,10 @@ import { createPlayer, stepPlayer, predictLanding, landSlideSpeed } from './sim/
 import { Bot } from './sim/bot.js'
 import { ScoreKeeper, COMBO_WINDOW } from './sim/score.js'
 import { GhostRecorder, GhostPlayer } from './sim/ghost.js'
-import { TRACKS, dailyTrack, levelOptions } from './sim/tracks.js'
+import { TRACKS, dailyTrack, dailyHeist, levelOptions } from './sim/tracks.js'
 import { COURSE_VERSION } from './sim/generator.js'
-import { HeistState, heistOptions } from './sim/heist.js'
-import { chromeById } from './sim/chrome.js'
+import { HeistState, heistOptions, LOADOUTS, threatScore } from './sim/heist.js'
+import { chromeById, SETS, SET_SIZE, makerCount, activeSets } from './sim/chrome.js'
 import { Input } from './input.js'
 import { Audio } from './audio.js'
 import { Hud, formatTime, medalFor } from './ui/hud.js'
@@ -92,7 +92,8 @@ if (localLab) {
   })
 }
 
-const MODES = [{ kind: 'heist' }, { kind: 'endless' }, ...TRACKS.map((track) => ({ kind: 'trial', track })), { kind: 'trial', daily: true }]
+// New modes go at the end: the saved menu selection is an index into this.
+const MODES = [{ kind: 'heist' }, { kind: 'endless' }, ...TRACKS.map((track) => ({ kind: 'trial', track })), { kind: 'trial', daily: true }, { kind: 'heist', daily: true }]
 
 // Times, splits, ghosts and daily medals belong to one course layout: a new
 // generator version starts them afresh (the first layout used bare keys).
@@ -154,6 +155,8 @@ const g = {
   fade: 1,
   district: '',
   runner: 'courier',
+  threat: 0,                // heist threat level selected on the title screen
+  daily: false,
   city: 0,                  // index into CITIES
   hintsShown: new Set(),
   cpNext: 0,
@@ -176,15 +179,31 @@ const g = {
 // ── records ──────────────────────────────────────────────────────────────
 
 const endlessBest = () => Number(store.get('fil.best.endless', 0)) || 0
-const heistBest = () => store.json('fil.best.heist')
+// the daily heist keeps its own best, for that day's city only
+const heistKey = (daily) => (daily ? `fil.best.${dailyHeist().id}` : 'fil.best.heist')
+const heistBest = (daily = false) => store.json(heistKey(daily))
+
+// Threat: every extraction unlocks the next level, hotter and worth more.
+const threatUnlocked = () => Math.min(HEIST.THREAT_MAX, Number(store.get('fil.heist.threat', 0)) || 0)
+const threatName = document.getElementById('threat-name')
+function setThreat(t) {
+  const max = threatUnlocked()
+  g.threat = Math.max(0, Math.min(max, t))
+  store.set('fil.heist.threatSel', String(g.threat))
+  threatName.textContent = g.threat ? `${g.threat} · SCORE ×${threatScore(g.threat)}` : '0 · STANDARD'
+  document.getElementById('threat-pick').classList.toggle('locked', max === 0)
+  if (g.mode === 'title') renderMenu()
+}
+const stepThreat = (d) => setThreat((g.threat + d + threatUnlocked() + 1) % (threatUnlocked() + 1))
 const trialPB = (track) => store.json(pbKey(track.id))
 
 function menuItems() {
   return MODES.map((m) => {
     if (m.kind === 'heist') {
-      const best = heistBest()
-      const sub = `roguelike · ${HEIST.SECTORS} sectors · chrome`
-      return { name: 'HEIST', sub, best: best ? `${best.extracted ? 'OUT' : `S${best.sector + 1}`} · ${best.score.toLocaleString()}` : '—', medal: -1 }
+      const best = heistBest(m.daily)
+      const day = dailyHeist().daily
+      const sub = m.daily ? `${day.slice(4, 6)}/${day.slice(6)} · same city for everyone` : `roguelike · ${HEIST.SECTORS} sectors${g.threat ? ` · threat ${g.threat}` : ''}`
+      return { name: m.daily ? 'DAILY HEIST' : 'HEIST', sub, best: best ? `${best.extracted ? 'OUT' : `S${best.sector + 1}`} · ${best.score.toLocaleString()}` : '—', medal: -1 }
     }
     if (m.kind === 'endless') {
       return { name: 'ENDLESS', sub: 'combo score attack', best: `${endlessBest().toLocaleString()} PTS`, medal: -1 }
@@ -227,6 +246,7 @@ function setRunner(id, animate = false) {
   if (animate) view.crossfade()
   view.setRunner(id)
   runnerName.textContent = RUNNER_STYLES[id].name.toUpperCase()
+  document.getElementById('runner-perk').textContent = `HEIST: ${LOADOUTS[id]?.perk ?? LOADOUTS.courier.perk}`
   const locked = Object.entries(UNLOCKS).filter(([style]) => !unlocked(style))
   document.getElementById('unlock-note').textContent = locked.map(([style, u]) => `${RUNNER_STYLES[style].name}: ${u.label}`).join(' · ')
 }
@@ -240,6 +260,7 @@ function stepRunner(d) {
   setRunner(RUNNERS[i], true)
 }
 setRunner(store.get('fil.runner', RUNNERS[0]).split(':')[0])
+setThreat(Number(store.get('fil.heist.threatSel', 0)) || 0)
 
 function renderMenu() {
   hud.menu(menuItems(), g.sel, (i) => start(i))
@@ -292,10 +313,13 @@ function newRun() {
   const m = MODES[g.sel]
   g.kind = m.kind
   g.track = m.kind === 'trial' ? trackOf(m) : null
-  const seed = fixedSeed ?? (Math.random() * 2 ** 32) >>> 0
+  g.daily = g.kind === 'heist' && !!m.daily
+  const seed = g.daily ? dailyHeist().seed : fixedSeed ?? (Math.random() * 2 ** 32) >>> 0
+  // the daily is the same heist for everyone: standard threat
+  const threat = g.kind === 'heist' && !g.daily ? g.threat : 0
   const level = g.kind === 'trial'
     ? new Level(g.track.seed, levelOptions(g.track))
-    : g.kind === 'heist' ? new Level(seed, heistOptions()) : new Level(seed)
+    : g.kind === 'heist' ? new Level(seed, heistOptions({ threat, routed: true })) : new Level(seed)
   buildWorld(level, false)
   g.clock = 0
   g.phaseT = 0
@@ -305,7 +329,7 @@ function newRun() {
   g.cpNext = 0
   g.splits = []
   g.hintsShown.clear()
-  g.heist = g.kind === 'heist' ? new HeistState(seed) : null
+  g.heist = g.kind === 'heist' ? new HeistState(seed, { threat, loadout: g.runner }) : null
   g.score = new ScoreKeeper()
   g.score.teleport(g.player.x)
   g.lives = RUN.LIVES
@@ -333,7 +357,8 @@ function newRun() {
     g.pb = null
     g.ghost = null
     g.recorder = null
-    const best = heistBest()
+    g.heist.startSector(level)
+    const best = heistBest(g.daily)
     hud.setupRun('heist', {
       title: '',
       best: best ? `BEST ${best.score.toLocaleString()}` : 'FIRST RUN',
@@ -341,7 +366,7 @@ function newRun() {
       checkpoints: level.checkpoints,
       length: level.finish.x,
     })
-    hud.chrome([])
+    showChrome()
     if (!g.seenHints.has('heist')) {
       g.seenHints.add('heist')
       store.set('fil.seen', JSON.stringify([...g.seenHints]))
@@ -415,6 +440,9 @@ input.on('runner', (d) => {
 input.on('side', (d) => {
   if (g.mode === 'title') setCity(g.city + d, true)
 })
+input.on('threat', () => {
+  if (g.mode === 'title') stepThreat(1)
+})
 input.on('confirm', () => {
   if (g.mode === 'shop') shopAction(g.shopSel)
   else if (g.mode === 'title') start(g.sel)
@@ -452,6 +480,8 @@ click('city-prev', (e) => { setCity(g.city - 1, true); e.currentTarget.blur() })
 click('city-next', (e) => { setCity(g.city + 1, true); e.currentTarget.blur() })
 click('runner-prev', (e) => { stepRunner(-1); e.currentTarget.blur() })
 click('runner-next', (e) => { stepRunner(1); e.currentTarget.blur() })
+click('threat-prev', (e) => { stepThreat(-1); e.currentTarget.blur() })
+click('threat-next', (e) => { stepThreat(1); e.currentTarget.blur() })
 // Fullscreen: toggled from the title screen or the HUD. Landscape is locked
 // where the browser allows it. iPhone Safari has no fullscreen API, so it gets
 // a hint to install to the home screen (the manifest launches fullscreen).
@@ -513,7 +543,7 @@ function onEvent(e) {
     g.moves++
     if (g.kind === 'trial') hud.toast(TOAST[e.type])
   }
-  if (g.kind !== 'trial') {
+  if (g.kind !== 'trial' && e.type !== 'contract' && e.type !== 'exfil') {
     const result = g.score.event(e.type, p.speed)
     if (result === 'bail') { hud.comboResult('bail', g.score.log.at(-1).points); audio.event('bail') }
   }
@@ -523,10 +553,41 @@ function onEvent(e) {
 
 // ── heist ───────────────────────────────────────────────────────────────
 
+// Maker sets that are switched on, for the HUD.
+const setsOf = (owned) => activeSets(owned).map((maker) => ({ maker, ...SETS[maker] }))
+function showChrome() {
+  const n = g.heist
+  hud.chrome(n.owned.map(chromeById), setsOf(n.owned))
+}
+
+function contractToast(failed) {
+  if (failed) hud.toast('CONTRACT LOST')
+  else { hud.toast('CONTRACT DONE', `¢${HEIST.CONTRACT_PAY} AT THE UPLINK`); audio.event('checkpoint') }
+}
+
+// A combo went to the bank: chrome and contracts may care how big it was.
+function banked() {
+  const last = g.score.log.at(-1)
+  hud.comboResult('bank', last.points)
+  if (g.heist && g.heist.banked(last.mult)) contractToast(g.heist.contract.failed)
+}
+
 function heistEvent(e) {
   const n = g.heist
-  n.move(e.type)
+  if (n.move(e.type)) contractToast(n.contract.failed)
   switch (e.type) {
+    case 'contract':
+      contractToast(e.failed)
+      break
+    case 'exfil':
+      hud.district('EXFIL · THEY KNOW WHERE YOU ARE GOING')
+      hud.toast('EXFIL', 'TRACE CLIMBING · KEEP MOVING')
+      audio.event('spotted')
+      view.glitch(0.5)
+      break
+    case 'shard':
+      if (e.focus) g.focus = Math.min(1, g.focus + e.focus)
+      break
     case 'zap':
       hud.toast('LASER GRID', e.keepsCombo ? 'INSULATED' : 'ALARM TRIPPED')
       if (!e.keepsCombo && g.score.bail() === 'bail') hud.comboResult('bail', g.score.log.at(-1).points)
@@ -539,7 +600,7 @@ function heistEvent(e) {
       if (e.focus) g.focus = Math.min(1, g.focus + e.focus)
       break
     case 'traced':
-      hud.toast('ICE BURN', 'INTEGRITY −1')
+      hud.toast('ICE BURN', e.free ? 'HARDENED · NO INTEGRITY LOST' : 'INTEGRITY −1')
       g.flash = 0.25
       if (g.score.bail() === 'bail') hud.comboResult('bail', g.score.log.at(-1).points)
       if (n.integrity <= 0) {
@@ -553,14 +614,14 @@ function heistEvent(e) {
 
 // The street doc: slots 0-2 are the chrome on offer, then repair, reroll and
 // jacking back in.
-const SHOP_ITEMS = 6
-const SHOP_LEAVE = 5
+const SHOP_ITEMS = 7
+const SHOP_ROUTE = 5
 
 function openShop() {
   const n = g.heist
+  if (g.score.bank() === 'bank') banked()
   g.payout = n.advance()
   n.openShop()
-  if (g.score.bank() === 'bank') hud.comboResult('bank', g.score.log.at(-1).points)
   g.mode = 'shop'
   g.focusActive = false
   g.shopSel = 0
@@ -579,22 +640,35 @@ function renderShop() {
     creds: n.creds,
     integrity: n.integrity,
     maxIntegrity: n.maxIntegrity,
-    offer: n.offer.map((c) => c && { ...c, have: n.owned.filter((o) => o === c.id).length, price: n.priceOf(c), ok: n.canInstall(c) }),
+    offer: n.offer.map((c) => c && {
+      ...c, have: n.owned.filter((o) => o === c.id).length, price: n.priceOf(c), ok: n.canInstall(c),
+      set: setProgress(n.owned, c),
+    }),
+    routes: n.routeOffer,
+    sets: setsOf(n.owned),
     free: n.freePick,
-    payout: g.payout, cleanBonus: HEIST.CLEAN_BONUS, fastBonus: HEIST.FAST_BONUS,
+    payout: g.payout,
     repair: { cost: n.repairCost, ok: n.canRepair, full: n.integrity >= n.maxIntegrity },
     reroll: { cost: n.rerollCost, ok: n.canReroll },
     owned: n.owned.map(chromeById),
   }, g.shopSel, shopAction)
 }
 
+// Where a piece on offer leaves its maker's set.
+function setProgress(owned, c) {
+  const have = makerCount(owned, c.maker)
+  return { ...SETS[c.maker], have, size: SET_SIZE, on: have >= SET_SIZE, completes: have === SET_SIZE - 1 }
+}
+
 function shopAction(i) {
   if (g.mode !== 'shop') return
   const n = g.heist
   g.shopSel = i
-  if (i === SHOP_LEAVE) {
+  if (i >= SHOP_ROUTE) {
+    if (!n.takeRoute(i - SHOP_ROUTE, g.level)) return
+    hud.toast(n.route.name.toUpperCase(), `SECTOR ${n.sector + 1}`)
     hud.showShop(false)
-    hud.chrome(n.owned.map(chromeById))
+    showChrome()
     hud.setLives(n.maxIntegrity)
     g.mode = 'countdown'
     g.countShown = -1
@@ -608,8 +682,8 @@ function shopAction(i) {
       g.score.window = COMBO_WINDOW + n.mods.comboBonus
       audio.event('install')
       hud.toast(c.name.toUpperCase(), 'INSTALLED')
-      // installed: the next press jacks back in unless you shop on
-      g.shopSel = SHOP_LEAVE
+      // installed: the next press takes a way on unless you shop on
+      g.shopSel = SHOP_ROUTE
     } else audio.event('deny')
     renderShop()
     return
@@ -621,15 +695,26 @@ function shopAction(i) {
 
 function endHeist(extracted) {
   const n = g.heist
-  if (g.score.bank() === 'bank') hud.comboResult('bank', g.score.log.at(-1).points)
-  const bonus = extracted ? 2500 + 1000 * n.integrity : 0
-  const score = Math.floor(g.score.total) + bonus
-  const prev = heistBest()
+  if (g.score.bank() === 'bank') banked()
+  // the last sector's contract pays in points: there's no uplink to spend at
+  const last = extracted ? n.settle() : null
+  const bonus = extracted ? 2500 + 1000 * n.integrity + (last.contract?.done ? 1000 : 0) : 0
+  const mult = threatScore(n.threat)
+  const score = Math.floor((g.score.total + bonus) * mult)
+  const prev = heistBest(g.daily)
   const newBest = !prev || score > prev.score
   const sector = extracted ? HEIST.SECTORS - 1 : n.sector
-  if (newBest) store.set('fil.best.heist', JSON.stringify({ score, sector, extracted }))
+  if (newBest) store.set(heistKey(g.daily), JSON.stringify({ score, sector, extracted, threat: n.threat }))
+  // a clean exit at the highest threat you have opens the next one
+  let unlocked = 0
+  if (extracted && !g.daily && n.threat === threatUnlocked() && n.threat < HEIST.THREAT_MAX) {
+    unlocked = n.threat + 1
+    store.set('fil.heist.threat', String(unlocked))
+    setThreat(unlocked)
+  }
   g.result = {
-    kind: 'heist', extracted, score, bonus, best: Math.max(prev?.score ?? 0, score), newBest,
+    kind: 'heist', daily: g.daily, threat: n.threat, mult, unlocked, sets: setsOf(n.owned),
+    extracted, score, bonus, best: Math.max(prev?.score ?? 0, score), newBest,
     sector, sectors: HEIST.SECTORS, creds: n.creds, stats: { ...n.stats }, chrome: n.owned.map(chromeById),
     topSpeed: g.topSpeed, bestCombo: g.score.bestCombo,
   }
@@ -943,7 +1028,7 @@ function frame(now) {
     if (g.heist && g.mode === 'run' && cur.x >= g.level.finish.x) endHeist(true)
     if (g.kind !== 'trial' && g.mode === 'run') {
       const r = g.score.update(dt, cur)
-      if (r === 'bank') { hud.comboResult('bank', g.score.log.at(-1).points); audio.event('bank', { mult: g.score.log.at(-1).mult }) }
+      if (r === 'bank') { banked(); audio.event('bank', { mult: g.score.log.at(-1).mult }) }
     }
     if (g.recorder) g.recorder.sample(g.clock, cur)
   }
@@ -1011,6 +1096,7 @@ function frame(now) {
         sub: subLine(n, Math.floor(distance), name),
         combo: { mult: s.mult, points: s.pending, moves: s.moves.join(' · '), timer: s.timer / s.window },
         trace: n?.trace,
+        contract: n ? n.contract : undefined,
         progress: n ? Math.min(1, Math.max(0, cur.x) / g.level.finish.x) : undefined,
       })
     }

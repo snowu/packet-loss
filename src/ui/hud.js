@@ -40,10 +40,11 @@ export function medalFor(time, medals) {
   return medals.findIndex((m) => time <= m)
 }
 
-function chromeTags(list) {
+// sets: [{ maker, name, desc }] maker sets that are switched on
+function chromeTags(list, sets = []) {
   const counts = new Map()
   for (const c of list) counts.set(c, (counts.get(c) ?? 0) + 1)
-  return [...counts].map(([c, n]) => `<i class="${c.rare ? 'rare' : ''} ${c.deal ? 'deal' : ''}" title="${c.name}: ${c.desc}">${c.short}${n > 1 ? ` ×${n}` : ''}</i>`).join('')
+  return sets.map((t) => `<i class="set" title="${t.maker} set: ${t.desc}">◆ ${t.name.toUpperCase()}</i>`).join('') + [...counts].map(([c, n]) => `<i class="${c.rare ? 'rare' : ''} ${c.deal ? 'deal' : ''}" title="${c.name}: ${c.desc}">${c.short}${n > 1 ? ` ×${n}` : ''}</i>`).join('')
 }
 
 export class Hud {
@@ -63,7 +64,7 @@ export class Hud {
       paused: $('paused'),
       traceFill: $('trace-fill'), traceVal: $('trace-val'), trace: $('trace-wrap'), chromeRow: $('chrome-row'),
       shop: $('shop'), shopKicker: $('shop-kicker'), shopCreds: $('shop-creds'), shopIntegrity: $('shop-integrity'),
-      shopOffer: $('shop-offer'), repair: $('btn-repair'), reroll: $('btn-reroll'), jack: $('btn-jack'), shopOwned: $('shop-owned'),
+      shopOffer: $('shop-offer'), repair: $('btn-repair'), reroll: $('btn-reroll'), routeA: $('btn-route-a'), routeB: $('btn-route-b'), contract: $('contract'), shopOwned: $('shop-owned'),
       shopTip: $('shop-tip'), shopPayout: $('shop-payout'),
     }
     this.segs = []
@@ -116,6 +117,7 @@ export class Hud {
     this.el.ticks.innerHTML = checkpoints.map((c) => `<i style="left:${(c.x / length) * 100}%"></i>`).join('')
     this.setLives(lives)
     this.el.chromeRow.innerHTML = ''
+    this.contract(null)
     this.el.combo.classList.remove('show')
     this.el.countdown.textContent = ''
   }
@@ -126,8 +128,22 @@ export class Hud {
   }
 
   // Installed chrome as small tags under the integrity pips.
-  chrome(list) {
-    this.el.chromeRow.innerHTML = chromeTags(list)
+  chrome(list, sets) {
+    this.el.chromeRow.innerHTML = chromeTags(list, sets)
+  }
+
+  // The sector's contract under the trace meter. job: { text, progress,
+  // target, avoid, failed, pay } or nothing.
+  contract(job) {
+    const el = this.el.contract
+    const key = job ? `${job.text}:${job.failed}:${job.avoid ? 0 : Math.min(job.target, Math.floor(job.progress))}` : ''
+    if (key === this.contractKey) return
+    this.contractKey = key
+    if (!job) { el.textContent = ''; el.className = 'contract'; return }
+    const done = !job.failed && !job.avoid && job.progress >= job.target
+    const count = job.avoid ? '' : ` ${Math.min(job.target, Math.floor(job.progress))}/${job.target}`
+    el.textContent = `◆ ${job.text}${count} · ¢${job.pay}`
+    el.className = `contract ${job.failed ? 'failed' : done ? 'done' : ''}`
   }
 
   // The street doc between heist sectors. Items 0-2 are the offer, 3 is
@@ -139,8 +155,10 @@ export class Hud {
     e.shopIntegrity.innerHTML = Array.from({ length: d.maxIntegrity }, (_, i) => `<i class="${i < d.integrity ? '' : 'lost'}"></i>`).join('')
     e.shopTip.textContent = d.free ? 'One piece of chrome is on the house. More cost creds.' : 'Creds buy more chrome, repairs and rerolls.'
     const pay = d.payout
+    const line = (got, text, creds) => `<span class="${got ? 'got' : ''}">${text}${got && creds ? ` +¢${creds}` : ''}</span>`
     e.shopPayout.innerHTML = pay
-      ? `<span class="${pay.clean ? 'got' : ''}">CLEAN SECTOR${pay.clean ? ` +¢${d.cleanBonus}` : ''}</span><span class="${pay.fast ? 'got' : ''}">FAST ${formatTime(pay.time)}${pay.fast ? ` +¢${d.fastBonus}` : ''}</span>`
+      ? line(pay.clean, 'CLEAN SECTOR', pay.cleanPay) + line(pay.fast, `FAST ${formatTime(pay.time)}`, pay.fastPay) +
+        (pay.contract ? line(pay.contract.done, `◆ ${pay.contract.text}`, pay.contract.pay) : '') + (pay.extra ? line(true, 'GHOST MARKET', pay.extra) : '')
       : ''
     e.shopOffer.innerHTML = ''
     const left = d.offer.some(Boolean)
@@ -156,22 +174,28 @@ export class Hud {
       li.className = `${i === sel ? 'sel' : ''} ${c.rare ? 'rare' : ''} ${c.deal ? 'deal' : ''} ${c.none || c.ok ? '' : 'off'}`
       const stack = c.max > 1 ? `<span class="stack">${c.have}/${c.max}</span>` : ''
       const price = c.none ? '' : `<div class="o-price">${c.price ? `¢ ${c.price}` : 'FREE'}</div>`
+      // what this piece does for its maker's set
+      const set = c.set ? `<div class="o-set ${c.set.on ? 'on' : c.set.completes ? 'next' : ''}">◆ ${c.set.name.toUpperCase()} ${c.set.on ? 'ACTIVE' : `${c.set.have}/${c.set.size}`}${c.set.completes ? ` · ${c.set.desc}` : ''}</div>` : ''
       li.innerHTML = `<div class="o-top"><span class="o-maker">${c.maker}</span><span class="o-tag">${c.rare ? 'RARE · ' : ''}${c.deal ? 'DEAL · ' : ''}${c.tag}</span></div>` +
-        `<div class="o-name">${c.name}${stack}</div><div class="o-desc">${c.desc}</div>${price}`
+        `<div class="o-name">${c.name}${stack}</div><div class="o-desc">${c.desc}</div>${set}${price}`
       if (!c.none) li.addEventListener('click', () => onPick(i))
       e.shopOffer.appendChild(li)
     })
     e.repair.innerHTML = d.repair.full ? 'REPAIR · FULL' : `REPAIR +1 · ¢ ${d.repair.cost}`
-    e.reroll.innerHTML = `REROLL · ¢ ${d.reroll.cost}`
+    e.reroll.innerHTML = d.reroll.cost ? `REROLL · ¢ ${d.reroll.cost}` : 'REROLL · FREE'
+    ;[e.routeA, e.routeB].forEach((btn, i) => {
+      const r = d.routes[i]
+      btn.className = `route heat${r.heat} ${sel === 5 + i ? 'sel' : ''}`
+      btn.innerHTML = `<b>${r.name.toUpperCase()}</b><small>${r.desc}</small>`
+      btn.onclick = () => onPick(5 + i)
+    })
     e.repair.classList.toggle('sel', sel === 3)
     e.reroll.classList.toggle('sel', sel === 4)
-    e.jack.classList.toggle('sel', sel === 5)
     e.repair.classList.toggle('off', !d.repair.ok)
     e.reroll.classList.toggle('off', !d.reroll.ok)
     e.repair.onclick = () => onPick(3)
     e.reroll.onclick = () => onPick(4)
-    e.jack.onclick = () => onPick(5)
-    e.shopOwned.innerHTML = d.owned.length ? `<span>INSTALLED</span>${chromeTags(d.owned)}` : ''
+    e.shopOwned.innerHTML = d.owned.length ? `<span>INSTALLED</span>${chromeTags(d.owned, d.sets)}` : ''
   }
 
   showOver(on, r) {
@@ -200,15 +224,17 @@ export class Hud {
         return `<li><span>${i === r.splits.length - 1 ? 'FINISH' : `CP ${i + 1}`}</span><b>${formatTime(t)}</b>${d}</li>`
       }).join('')
     } else if (r.kind === 'heist') {
-      e.overKicker.textContent = r.extracted ? 'HEIST · EXTRACTED' : `HEIST · SECTOR ${r.sector + 1}/${r.sectors}`
+      const what = `${r.daily ? 'DAILY HEIST' : 'HEIST'}${r.threat ? ` · THREAT ${r.threat}` : ''}`
+      e.overKicker.textContent = r.extracted ? `${what} · EXTRACTED` : `${what} · SECTOR ${r.sector + 1}/${r.sectors}`
       e.overTitle.innerHTML = r.extracted ? 'CLEAN <em>EXIT</em>' : r.newBest ? 'NEW <em>BEST</em>' : '<em>FLAT</em>LINED'
       e.overMain.textContent = Math.floor(r.score).toLocaleString()
       e.overUnit.textContent = 'PTS'
       e.overBest.classList.toggle('new', r.newBest)
-      e.overBest.innerHTML = `BEST <b>${Math.floor(r.best).toLocaleString()}</b>${r.bonus ? ` · EXTRACTION <b>+${r.bonus.toLocaleString()}</b>` : ''}`
-      e.overStats.innerHTML = `<div><b>${r.stats.shards}</b><span>SHARDS</span></div><div><b>${r.stats.takedowns}</b><span>TAKEDOWNS</span></div><div><b>${r.stats.clean}</b><span>CLEAN SECTORS</span></div>` +
+      e.overBest.innerHTML = `BEST <b>${Math.floor(r.best).toLocaleString()}</b>${r.bonus ? ` · EXTRACTION <b>+${r.bonus.toLocaleString()}</b>` : ''}${r.mult > 1 ? ` · THREAT <b>×${r.mult}</b>` : ''}` +
+        (r.unlocked ? `<div class="unlocked">THREAT ${r.unlocked} UNLOCKED</div>` : '')
+      e.overStats.innerHTML = `<div><b>${r.stats.shards}</b><span>SHARDS</span></div><div><b>${r.stats.takedowns}</b><span>TAKEDOWNS</span></div><div><b>${r.stats.contracts}</b><span>CONTRACTS</span></div>` +
         `<div><b>${Math.floor(r.bestCombo).toLocaleString()}</b><span>BEST COMBO</span></div>`
-      e.overMedals.innerHTML = r.chrome.length ? `<div class="chrome-row big">${chromeTags(r.chrome)}</div>` : ''
+      e.overMedals.innerHTML = r.chrome.length ? `<div class="chrome-row big">${chromeTags(r.chrome, r.sets)}</div>` : ''
     } else {
       e.overKicker.textContent = 'ENDLESS · RUN OVER'
       e.overTitle.innerHTML = r.newBest ? 'NEW <em>BEST</em>' : 'OUT OF <em>LIVES</em>'
@@ -224,7 +250,8 @@ export class Hud {
 
   // Bars that move every frame scale instead of changing width, so they
   // repaint without a layout.
-  update({ score, speed, focus, focusActive, focusReady, time, progress, lives, combo, sub, trace }) {
+  update({ score, speed, focus, focusActive, focusReady, time, progress, lives, combo, sub, trace, contract }) {
+    if (contract !== undefined) this.contract(contract)
     if (trace !== undefined) {
       const prev = this.last.trace
       this.set('trace', Math.round(Math.min(1, trace) * 100), (v) => {

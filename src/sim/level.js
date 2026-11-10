@@ -1,12 +1,15 @@
 // Streams generated chunks around the player and answers collision queries.
 
 import { WORLD } from './config.js'
-import { CourseGenerator } from './generator.js'
+import { CourseGenerator, secureChunk } from './generator.js'
 
 export class Level {
   constructor(seed, options = {}) {
     this.seed = seed
-    this.generator = new CourseGenerator(seed, options)
+    // options.routes: the route each sector's security follows, by sector.
+    // Sectors without one yet get theirs from setRoute.
+    this.routes = options.routes ?? null
+    this.generator = new CourseGenerator(seed, this.routes ? { ...options, routeFor: (sector) => this.routes[sector] } : options)
     this.chunks = []
     this.checkpoints = []
     this.finish = null
@@ -25,6 +28,25 @@ export class Level {
       if (chunk.finish) this.finish = chunk.finish
       for (const fn of this.listeners.add) fn(chunk)
     }
+  }
+
+  // Choose a sector's route: its roofs get their security now, and any
+  // still to be generated get it as they appear.
+  setRoute(sector, route) {
+    this.routes[sector] = route
+    for (const c of this.chunks) if (c.sector === sector) secureChunk(c, route)
+  }
+
+  // What a sector holds, for contracts that count on it.
+  sectorContents(sector) {
+    const out = { shards: 0, drones: 0, lasers: 0 }
+    for (const c of this.chunks) {
+      if (c.sector !== sector) continue
+      out.shards += c.shards.length
+      out.drones += c.drones.length
+      out.lasers += c.lasers.length
+    }
+    return out
   }
 
   // Drop chunks that end well behind x.
