@@ -372,6 +372,27 @@ body.pixel .banner { color: #eef6ff; text-shadow: -2px 0 var(--pink), 2px 0 var(
 .shop-payout span.got { color: #5dff8a; }
 .chrome-row i.deal, .shop-owned i.deal { background: var(--pink); }
 .action.primary.sel { box-shadow: 0 4px 0 #0b6f80, 0 0 0 2px #05040d, 0 0 0 4px #eef6ff, 0 0 14px rgba(41, 243, 255, 0.6); }
+.o-set { font: 400 9px/1.4 'Silkscreen', monospace; letter-spacing: 0.04em; color: #8fa0c8; }
+.o-set.next, .o-set.on { color: #5dff8a; }
+.chrome-row i.set, .shop-owned i.set { background: #5dff8a; }
+.shop-routes { display: grid; grid-template-columns: auto 1fr 1fr; align-items: stretch; gap: 10px; margin-top: 12px; }
+.shop-routes > span { align-self: center; font: 400 10px/1 'Silkscreen', monospace; color: #8fa0c8; }
+.route {
+  display: flex; flex-direction: column; gap: 5px; padding: 10px 12px 9px; text-align: left; cursor: pointer; border: 0; color: #05040d;
+  background: var(--cyan); box-shadow: 0 4px 0 #0b6f80;
+}
+.route b { font: 400 13px/1 'Silkscreen', monospace; letter-spacing: 0.04em; }
+.route small { font: 400 13px/1.2 'Pixelify Sans', monospace; }
+.route.heat1 { background: #ffe14d; box-shadow: 0 4px 0 #8a7410; }
+.route.heat2 { background: var(--pink); box-shadow: 0 4px 0 #7a1050; }
+.route.sel { outline: 2px solid #eef6ff; outline-offset: 2px; }
+.contract { margin-top: 6px; font: 400 10px/1 'Silkscreen', monospace; letter-spacing: 0.06em; color: #ffe14d; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); white-space: nowrap; }
+.contract:empty { display: none; }
+.contract.done { color: #5dff8a; }
+.contract.failed { color: #8fa0c8; text-decoration: line-through; }
+.unlock-note.perk { color: #5dff8a; }
+.best-line .unlocked { margin-top: 6px; color: #ffe14d; }
+#threat-pick.locked { display: none; }
 .shop-actions { margin-top: 12px; }
 .action.sel { box-shadow: 0 4px 0 #05040d, inset 0 0 0 2px var(--cyan), 0 0 14px rgba(41, 243, 255, 0.45); }
 .action.off { opacity: 0.45; }

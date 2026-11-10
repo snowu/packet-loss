@@ -43,6 +43,7 @@ export class Input {
       if (e.code === 'ArrowRight' || e.code === 'KeyD') this.handlers.side?.(1)
       if (e.code === 'KeyQ') this.handlers.runner?.(-1)
       if (e.code === 'KeyE') this.handlers.runner?.(1)
+      if (e.code === 'KeyT') this.handlers.threat?.()
       if (e.code === 'Space') this.handlers.confirm?.()
       if (e.code === 'Enter') this.handlers.enter?.()
       if (e.code === 'KeyR') this.handlers.restart?.()

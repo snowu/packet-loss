@@ -40,6 +40,30 @@ export const CHROME = [
     desc: '+7 km/h top speed and clean moves jam twice the trace. −1 max integrity.' },
 ]
 
+// Maker sets: two pieces from one maker (stacks count) switch on a bonus.
+export const SETS = {
+  KITE: { name: 'Tailwind', desc: 'Landing slides are far easier to time.' },
+  VOLT: { name: 'Live Wire', desc: 'Full speed hides you from the trace almost completely.' },
+  STRATA: { name: 'Bulwark', desc: 'Stumbles are over in half the time and make no noise.' },
+  HELIX: { name: 'Lifeline', desc: 'Ledge grabs keep all your speed and jam twice the trace.' },
+  ORBIT: { name: 'Overwatch', desc: 'Every shard charges focus.' },
+  PULSE: { name: 'Reflex', desc: 'Banking a combo jams the trace, more the bigger it was.' },
+  NOVA: { name: 'Hardened', desc: 'The first ICE burn in each sector costs no integrity.' },
+  'ZEN 24': { name: 'Ghost Market', desc: 'Rerolls are free and every uplink pays ¢30.' },
+}
+export const SET_SIZE = 2
+
+export function makerCount(owned, maker) {
+  let n = 0
+  for (const id of owned) if (BY_ID[id]?.maker === maker) n++
+  return n
+}
+
+// Makers whose set is switched on.
+export function activeSets(owned) {
+  return Object.keys(SETS).filter((maker) => makerCount(owned, maker) >= SET_SIZE)
+}
+
 const BY_ID = Object.fromEntries(CHROME.map((c) => [c.id, c]))
 
 export function chromeById(id) { return BY_ID[id] }
@@ -65,7 +89,14 @@ export function rollOffer(rng, owned, n = 3) {
 // Fold installed chrome into PHYS overrides and run modifiers.
 export function chromeEffects(owned) {
   const n = (id) => countOf(owned, id)
+  const set = (maker) => makerCount(owned, maker) >= SET_SIZE
   const phys = {}
+  if (set('KITE')) {
+    phys.LANDSLIDE_PRE = (v) => v * 1.8
+    phys.LANDSLIDE_POST = (v) => v * 1.8
+  }
+  if (set('STRATA')) phys.STUMBLE_TIME = (v) => v * 0.5
+  if (set('HELIX')) phys.MANTLE_KEEP = () => 1
   if (n('tendons')) phys.AIR_JUMPS = (v) => v + n('tendons')
   if (n('calves') || n('overdrive')) {
     phys.SPEED_MAX = (v) => v + 1.1 * n('calves') + 1.9 * n('overdrive')
@@ -96,6 +127,15 @@ export function chromeEffects(owned) {
     takedownSpeed: 1.4 * n('adrenal'),
     takedownFocus: 0.15 * n('adrenal'),
     freeFalls: n('secondwind'),
+    // maker sets
+    flowHide: set('VOLT') ? 0.4 : 0,
+    quietStumbles: set('STRATA'),
+    grabJam: set('HELIX') ? 2 : 1,
+    shardFocus: set('ORBIT') ? 0.025 : 0,
+    bankJam: set('PULSE') ? 0.012 : 0,
+    freeBurns: set('NOVA') ? 1 : 0,
+    freeRerolls: set('ZEN 24'),
+    uplinkCreds: set('ZEN 24') ? 30 : 0,
   }
   return { phys, run }
 }

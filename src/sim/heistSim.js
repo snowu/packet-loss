@@ -14,10 +14,13 @@ import { createRng } from './rng.js'
 // uplink, in order. every: seconds between samples.
 // slip: share of roofs (picked by seed) on which a careful autopilot stops
 // watching for security, to stand in for a player who isn't perfect.
-export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25, maxTime = 600, slip = 0 } = {}) {
-  const level = new Level(seed, heistOptions())
+// route: which of the two ways on to take at each uplink: 'safe' (the cooler
+// one), 'hot', or nothing to stay on the main line throughout.
+export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25, maxTime = 600, slip = 0, route = null, threat = 0, loadout = 'courier' } = {}) {
+  const level = new Level(seed, heistOptions({ threat, routed: !!route }))
   level.ensure(HEIST.SECTORS * HEIST.SECTOR_LEN + 120)
-  const net = new HeistState(seed)
+  const net = new HeistState(seed, { threat, loadout })
+  net.startSector(level)
   const bot = new Bot(level, { heist: careful })
   let p = createPlayer(0, level.roofAt(0))
   const events = []
@@ -26,7 +29,7 @@ export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25,
   let t = 0, nextSample = 0, falls = 0
   const slips = createRng((seed ^ 0x51f) >>> 0)
   let roof = null
-  const payouts = []
+  const payouts = [], routes = []
   while (p.x < level.finish.x && t < maxTime && net.integrity > 0) {
     if (slip > 0 && careful) {
       const here = level.roofStartBehind(p.x + 6).x
@@ -44,6 +47,9 @@ export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25,
       payouts.push(net.advance())
       net.openShop()
       if (chrome[net.sector - 1]) net.install(chrome[net.sector - 1])
+      if (route) net.takeRoute(route === 'hot' ? 1 : 0, level)
+      else net.startSector(level)
+      routes.push(net.route.id)
     }
     if (!p.alive) {
       falls++
@@ -61,7 +67,7 @@ export function simulateHeist(seed, { careful = true, chrome = [], every = 0.25,
   net.dispose()
   return {
     seed, careful, time: t, falls, sectors, samples, marks,
-    stats: { ...net.stats }, integrity: net.integrity, maxIntegrity: net.maxIntegrity, creds: net.creds, payouts, sector: net.sector,
+    stats: { ...net.stats }, integrity: net.integrity, maxIntegrity: net.maxIntegrity, creds: net.creds, payouts, routes, sector: net.sector,
     extracted: p.x >= level.finish.x && net.integrity > 0,
   }
 }
