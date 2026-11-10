@@ -14,10 +14,14 @@ changes from master.
 - The canvas has twice the previous raster resolution in each axis. World
   coordinates and physics stay in the same units; image assets draw into this
   higher-resolution surface with nearest-neighbour sampling.
-- Courier, Windbreaker and Techwear each have a transparent 16-frame atlas.
-  Running cycles through six frames; the other frames cover airborne movement,
+- Courier, Windbreaker and Techwear each have a transparent traversal atlas
+  and a six-part running rig. Running is baked from articulated limbs into
+  64 registered frames per outfit; the traversal frames cover airborne movement,
   sliding, vaulting, hanging, climbing, wall-running, ziplines, rolls and idle.
   Ghosts use the same production artwork with a cyan treatment.
+- Running phase follows distance travelled. Both feet alternate, planted feet
+  track the roof, and each contact drives the footstep sound. Focus and pause
+  use the same phase as the visible sprite. See [the gait fix](run-gait.md).
 - A 16-cell environment kit supplies the tank, AC, vent, ramen sign, drone,
   crate, overhead pipe, springboard, duct, data shard, wall panel, cables and
   facade materials. Procedural course geometry determines object placement and

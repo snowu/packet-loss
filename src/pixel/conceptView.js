@@ -4,6 +4,8 @@ import { paletteAt } from './palette.js'
 import { css, hash, mix } from './pixels.js'
 import { PPU } from './sprites.js'
 import { FocusFilter } from './focus.js'
+import { RunGait, RUN_STRIDE, STANCE, runFrame } from './runGait.js'
+import { bakeRunFrames, RUN_ORIGIN } from './runRig.js'
 
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -14,6 +16,9 @@ export class ConceptView extends PixelView {
   constructor() {
     super()
     this.art = conceptArt()
+    this.gait = new RunGait()
+    this.ghostGait = new RunGait()
+    this.runFrames = Object.fromEntries(Object.entries(this.art.rigs).map(([name, parts]) => [name, bakeRunFrames(parts)]))
     this.backgrounds = new Map()
     this.materials = new Map()
     this.kitCache = new Map()
@@ -50,6 +55,7 @@ export class ConceptView extends PixelView {
   snap(x, y) { super.snap(x, y); this.cam.x = x + this.W * 0.18 / PPU; this.cam.y = y + 3.8 }
   crossfade() { this.stale = true }
   bind(level) {
+    this.gait?.reset(); this.ghostGait?.reset()
     if (this.materials) { for (const cv of this.materials.values()) cv.width = cv.height = 0; this.materials.clear() }
     super.bind(level)
   }
@@ -73,9 +79,16 @@ export class ConceptView extends PixelView {
     ctx.setTransform(2, 0, 0, 2, 0, 0)
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'
     if (s.mode !== 'paused') {
-      // Retain the movement-driven footstep/event hooks, but render the atlas.
+      // The visible contact and its sound share one distance-driven clock.
       this.stepPoint = { x: s.rx, y: s.ry, speed: s.p.speed }
-      this.runner.update(s.dt, s.p, s.rx * PPU, s.ry * PPU, s.idle ? 'idle' : null)
+      const contact = this.gait.update(s.p, s.rx, s.dt, s.idle)
+      if (contact !== null) {
+        this.onStep?.('run')
+        this.water.splash(s.rx + RUN_STRIDE * STANCE / 2, s.ry, s.p.speed, this.weather.wet)
+      }
+      if (s.p.state !== 'run' || s.idle) this.runner.update(s.dt, s.p, s.rx * PPU, s.ry * PPU, s.idle ? 'idle' : null)
+      if (s.ghost) this.ghostGait.update(s.ghost, s.ghost.x, s.dt)
+      else this.ghostGait.reset()
       this.updateCamera(s.raw, s)
       this.updateWeather(s.raw, pal)
     }
@@ -85,10 +98,10 @@ export class ConceptView extends PixelView {
     this.drawGates(s, pal)
     if (s.ghost) {
       ctx.save(); ctx.globalAlpha = 0.4
-      this.drawActor(s.ghost, this.sx(s.ghost.x), this.sy(s.ghost.y), s.time, false, true)
+      this.drawActor(s.ghost, this.sx(s.ghost.x), this.sy(s.ghost.y), s.time, false, true, this.ghostGait.phase)
       ctx.restore()
     }
-    if (!this.hide.runner) this.drawActor(s.p, this.sx(s.rx), this.sy(s.ry), this.cam.time, s.idle)
+    if (!this.hide.runner) this.drawActor(s.p, this.sx(s.rx), this.sy(s.ry), this.cam.time, s.idle, false, this.gait.phase)
     this.effects.update(s.dt, s.p, s.rx, s.ry)
     this.effects.draw(ctx, x => this.sx(x), y => this.sy(y))
     this.drawLandCue(s)
@@ -264,7 +277,15 @@ export class ConceptView extends PixelView {
     this.wrecks = this.wrecks.filter(w => { w.life -= s.dt; w.vy -= 30 * s.dt; w.x += w.vx * s.dt; w.y += w.vy * s.dt; if (w.life <= 0) return false; ctx.save(); ctx.globalAlpha = Math.min(1, w.life * 2); this.kit('drone', this.sx(w.x) - 12, this.sy(w.y), 24, 13); ctx.restore(); return true })
   }
 
-  drawActor(p, x, y, time, idle = false, ghost = false) {
+  drawActor(p, x, y, time, idle = false, ghost = false, phase = (p.x ?? time * 12) / RUN_STRIDE) {
+    if (p.state === 'run' && !idle) {
+      const im = this.runFrames[this.runnerId][runFrame(phase)], ctx = this.ctx
+      ctx.save()
+      if (ghost) { ctx.globalAlpha *= 0.5; ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)' }
+      ctx.drawImage(im, x - RUN_ORIGIN[0], y - RUN_ORIGIN[1], im.width / 2, im.height / 2)
+      ctx.restore()
+      return
+    }
     const index = poseFor(p, time, idle), im = (this.preparedActors[this.runnerId] || this.preparedActors.courier)[index], ctx = this.ctx
     const w = im.width / 2, h = im.height / 2
     ctx.save()

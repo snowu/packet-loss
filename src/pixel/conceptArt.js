@@ -22,18 +22,18 @@ export function poseFor(p, time, idle = false) {
   }
 }
 
-export function atlasCell(width, height, index) {
-  const x0 = Math.round((index % 4) * width / 4), y0 = Math.round(Math.floor(index / 4) * height / 4)
-  return { x: x0, y: y0, w: Math.round((index % 4 + 1) * width / 4) - x0, h: Math.round((Math.floor(index / 4) + 1) * height / 4) - y0 }
+export function atlasCell(width, height, index, columns = 4, rows = 4) {
+  const x0 = Math.round((index % columns) * width / columns), y0 = Math.round(Math.floor(index / columns) * height / rows)
+  return { x: x0, y: y0, w: Math.round((index % columns + 1) * width / columns) - x0, h: Math.round((Math.floor(index / columns) + 1) * height / rows) - y0 }
 }
 
-function frames(image) {
+function frames(image, columns = 4, rows = 4) {
   const cv = document.createElement('canvas')
   cv.width = image.width; cv.height = image.height
   const c = cv.getContext('2d', { willReadFrequently: true }); c.drawImage(image, 0, 0)
   const rgba = c.getImageData(0, 0, cv.width, cv.height).data
-  return Array.from({ length: 16 }, (_, i) => {
-    const cell = atlasCell(cv.width, cv.height, i)
+  return Array.from({ length: columns * rows }, (_, i) => {
+    const cell = atlasCell(cv.width, cv.height, i, columns, rows)
     let left = cell.w, top = cell.h, right = -1, bottom = -1
     for (let y = 0; y < cell.h; y++) for (let x = 0; x < cell.w; x++) {
       if (rgba[((cell.y + y) * cv.width + cell.x + x) * 4 + 3] < 32) continue
@@ -53,9 +53,10 @@ export async function loadConceptArt() {
     const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error(`Cannot load ${name}`)); im.src = base + name
   })
   try {
-    const [courier, environment, skyline, windbreaker, techwear] = await Promise.all(['courier-atlas.png', 'environment-atlas.png', 'skyline.png', 'windbreaker-atlas.png', 'techwear-atlas.png'].map(image))
+    const [courier, environment, skyline, windbreaker, techwear, courierRig, windbreakerRig, techwearRig] = await Promise.all(['courier-atlas.png', 'environment-atlas.png', 'skyline.png', 'windbreaker-atlas.png', 'techwear-atlas.png', 'courier-rig.png', 'windbreaker-rig.png', 'techwear-rig.png'].map(image))
     art = { courier: frames(courier), kit: frames(environment), skyline }
     art.outfits = { courier: art.courier, windbreaker: frames(windbreaker), techwear: frames(techwear) }
+    art.rigs = { courier: frames(courierRig, 3, 2), windbreaker: frames(windbreakerRig, 3, 2), techwear: frames(techwearRig, 3, 2) }
     art.runnerScale = 37 / Math.max(...art.courier.slice(0, 6).map(c => c.height), art.courier[15].height)
     // District colour work happens before gameplay, not on a scrolling frame.
     art.backgrounds = new Map()

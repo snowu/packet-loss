@@ -1,0 +1,125 @@
+// Verify actual game audio callbacks against the displayed gait, then capture
+// every outfit's stride and an optional real gameplay recording with sound.
+// CHROMIUM_PATH=... node bench/gait-review.js [--record]
+import assert from 'node:assert/strict'
+import { createServer } from 'vite'
+import { chromium } from 'playwright'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { setTimeout as pause } from 'node:timers/promises'
+
+const output = 'docs/screenshots/gait'
+mkdirSync(output, { recursive: true })
+const server = await createServer({ logLevel: 'error', server: { port: 0 } }); await server.listen()
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--autoplay-policy=no-user-gesture-required'] })
+const base = server.resolvedUrls.local[0]
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+  await page.route(/https:\/\/fonts\./, r => r.abort())
+  const errors = []; page.on('pageerror', e => errors.push(e.message))
+  const source = readFileSync(new URL('./bench.js', import.meta.url), 'utf8')
+  const pin = source.slice(source.indexOf('function pinWorld()'), source.indexOf('// Runs in the page: counts'))
+  await page.addInitScript(`${pin}; pinWorld()`)
+  await page.goto(`${base}?seed=12345&quality=0`)
+  while (!(await page.evaluate(() => !!window.__game))) await pause(20)
+  const report = await page.evaluate(async () => {
+    const G = window.__game, v = G.view
+    const { Audio } = await import('/packet-loss/src/audio.js')
+    const { Bot } = await import('/packet-loss/src/sim/bot.js')
+    const { runFrame, runPose } = await import('/packet-loss/src/pixel/runGait.js')
+    const sounds = [], rendered = [], states = new Set()
+    let pending = null, focusSteps = 0
+    Audio.prototype.step = function (kind) {
+      if (kind !== 'run') return
+      const phase = v.gait.phase, foot = Math.floor(phase * 2) & 1
+      const contact = runPose(phase)[foot ? 'far' : 'near']
+      if (!contact.planted) throw new Error('Footstep while the foot is airborne')
+      pending = phase
+      sounds.push({ phase, frame: runFrame(phase), state: G.g.player.state })
+      if (G.g.focusActive) focusSteps++
+    }
+    const drawActor = v.drawActor.bind(v)
+    v.drawActor = function (p, x, y, time, idle, ghost, phase) {
+      if (!ghost) {
+        states.add(p.state)
+        if (pending !== null) {
+          if (p.state !== 'run' || phase !== pending) throw new Error('Sound and rendered gait disagree')
+          rendered.push(phase); pending = null
+        }
+      }
+      return drawActor(p, x, y, time, idle, ghost, phase)
+    }
+    for (const outfit of ['courier', 'windbreaker', 'techwear']) {
+      G.start(1); v.setRunner(outfit); G.g.bot = new Bot(G.g.level)
+      for (let i = 0; i < 1100; i++) {
+        if (i === 360) { G.g.focus = 1; G.g.focusActive = true }
+        window.__tick()
+        if (i % 120 === 0) await window.__yield()
+      }
+      const phase = v.gait.phase, count = sounds.length
+      G.g.mode = 'paused'
+      for (let i = 0; i < 60; i++) window.__tick()
+      if (v.gait.phase !== phase || sounds.length !== count) throw new Error('Paused gait advanced')
+    }
+    return { sounds: sounds.length, matchedDraws: rendered.length, focusSteps, states: [...states], pending }
+  })
+  assert.ok(report.sounds > 20); assert.equal(report.sounds, report.matchedDraws)
+  assert.ok(report.focusSteps > 0); assert.equal(report.pending, null)
+  const sheet = await page.evaluate(async () => {
+    const v = window.__game.view
+    const cv = document.createElement('canvas'); cv.width = 1440; cv.height = 780
+    const c = cv.getContext('2d'); c.fillStyle = '#0c091b'; c.fillRect(0, 0, cv.width, cv.height)
+    c.fillStyle = '#eee8db'; c.font = 'bold 24px monospace'; c.fillText('RUN CYCLE / ALTERNATING CONTACTS', 30, 40)
+    c.fillStyle = '#bfaecf'; c.font = '16px monospace'; c.fillText('NEAR CONTACT                                   FAR CONTACT', 44, 78)
+    for (const [row, outfit] of ['courier', 'windbreaker', 'techwear'].entries()) {
+      c.fillStyle = '#bfaecf'; c.fillText(outfit.toUpperCase(), 30, 115 + row * 220)
+      for (let col = 0; col < 8; col++) {
+        const im = v.runFrames[outfit][col * 8]
+        c.drawImage(im, 8 + col * 178, 122 + row * 220, im.width * 1.5, im.height * 1.5)
+        c.fillStyle = col === 0 || col === 4 ? '#ff6654' : '#44394f'
+        c.fillRect(30 + col * 178, 258 + row * 220, 135, 2)
+        c.fillStyle = '#bfaecf'; c.fillText(String(col + 1), 88 + col * 178, 285 + row * 220)
+      }
+    }
+    return cv.toDataURL('image/png').split(',')[1]
+  })
+  writeFileSync(`${output}/run-cycle.png`, Buffer.from(sheet, 'base64'))
+  assert.deepEqual(errors, [])
+  console.log('Gait/audio browser check:', JSON.stringify(report))
+  await page.close()
+
+  if (process.argv.includes('--record')) {
+    const video = await browser.newPage({ viewport: { width: 1280, height: 720 } })
+    await video.route(/https:\/\/fonts\./, r => r.abort())
+    await video.goto(`${base}?seed=12345&quality=0`)
+    await video.waitForFunction(() => !!window.__game)
+    await video.evaluate(async () => {
+      const { Audio } = await import('/packet-loss/src/audio.js')
+      const start = Audio.prototype.start
+      Audio.prototype.start = function () { start.call(this); window.__audioCapture = this }
+      window.__game.start(1)
+      const { Bot } = await import('/packet-loss/src/sim/bot.js')
+      window.__game.g.bot = new Bot(window.__game.g.level)
+    })
+    await video.waitForFunction(() => window.__game.g.mode === 'run')
+    const data = await video.evaluate(async () => {
+      const a = window.__audioCapture, v = window.__game.view
+      await a.ctx.resume()
+      const audio = a.ctx.createMediaStreamDestination(); a.master.connect(audio)
+      const stream = v.canvas.captureStream(60)
+      stream.addTrack(audio.stream.getAudioTracks()[0])
+      const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 3500000 })
+      const chunks = []; rec.ondataavailable = e => chunks.push(e.data)
+      const done = new Promise(resolve => { rec.onstop = resolve })
+      rec.start()
+      await new Promise(resolve => setTimeout(resolve, 10000))
+      rec.stop(); await done
+      a.master.disconnect(audio); stream.getTracks().forEach(t => t.stop())
+      const blob = new Blob(chunks, { type: 'video/webm' })
+      return new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(blob) })
+    })
+    writeFileSync(`${output}/gameplay-with-audio.webm`, Buffer.from(data, 'base64'))
+    await video.screenshot({ path: `${output}/gameplay.png` })
+    await video.close()
+    console.log('Actual gameplay recording saved with live game audio.')
+  }
+} finally { await browser.close(); await server.close() }

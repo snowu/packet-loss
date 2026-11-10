@@ -47,6 +47,21 @@ describe('production concept art', () => {
 
   it('precaches all production artwork for offline play', () => {
     const sw = serviceWorker('test', [])
-    for (const name of ['courier-atlas.png', 'windbreaker-atlas.png', 'techwear-atlas.png', 'environment-atlas.png', 'skyline.png']) expect(sw).toContain(`concept-art/${name}`)
+    for (const name of ['courier-atlas.png', 'windbreaker-atlas.png', 'techwear-atlas.png', 'environment-atlas.png', 'skyline.png', 'courier-rig.png', 'windbreaker-rig.png', 'techwear-rig.png']) expect(sw).toContain(`concept-art/${name}`)
+  })
+
+  it('ships six complete transparent rig parts for each outfit', () => {
+    for (const name of ['courier', 'windbreaker', 'techwear']) {
+      const { w, h, rgba } = decodePng(readFileSync(new URL(`../public/concept-art/${name}-rig.png`, import.meta.url)))
+      for (let i = 0; i < 6; i++) {
+        const cell = atlasCell(w, h, i, 3, 2)
+        let opaque = 0, clear = 0
+        for (let y = cell.y; y < cell.y + cell.h; y++) for (let x = cell.x; x < cell.x + cell.w; x++) {
+          if (rgba[(y * w + x) * 4 + 3] > 32) opaque++; else clear++
+        }
+        expect(opaque, `${name} part ${i}`).toBeGreaterThan(500)
+        expect(clear, `${name} part ${i} gutters`).toBeGreaterThan(500)
+      }
+    }
   })
 })
