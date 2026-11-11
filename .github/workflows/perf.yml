@@ -23,7 +23,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
+      # The runner image already has Chromium's libraries. The extra system
+      # packages are mostly fonts; when the package mirror is unreachable,
+      # carry on without them instead of failing before any check has run.
+      - name: Install Chromium system packages (best effort)
+        run: timeout -k 10 240 npx playwright install-deps chromium || echo "::warning::Chromium system packages were not installed; text may use fallback fonts."
       - run: npm test
       - run: npm run build
       - run: node bench/concept-verify.js
@@ -54,7 +59,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
+      # The runner image already has Chromium's libraries. The extra system
+      # packages are mostly fonts; when the package mirror is unreachable,
+      # carry on without them instead of failing before any check has run.
+      - name: Install Chromium system packages (best effort)
+        run: timeout -k 10 240 npx playwright install-deps chromium || echo "::warning::Chromium system packages were not installed; text may use fallback fonts."
       - run: npm run test:render
       - run: npm run bench:check
       - run: npm run bench:runs -- --track=0 --runs=4 --frames=1200 --check
