@@ -4,24 +4,6 @@ export const KIT = Object.freeze({ tank: 0, ac: 1, vent: 2, sign: 3, drone: 4, c
 export const ATLAS_GRID = 4
 let art = null
 
-export function poseFor(p, time, idle = false) {
-  const t = Number.isFinite(time) ? Math.max(0, time) : 0
-  const speed = Number.isFinite(p.speed) ? p.speed : 12
-  if (idle || p.state === 'idle' || p.state === 'blocked') return 15
-  switch (p.state) {
-    case 'slide': return 8
-    case 'vault': case 'mantle': return 9
-    case 'climb': return 11
-    case 'wallslide': return 10
-    case 'wallrun': return 12
-    case 'zip': return 13
-    case 'roll': case 'dead': return 14
-    case 'air': return p.vy > 1 ? 6 : 5
-    case 'stumble': return 7
-    default: return Math.floor(t * Math.max(6, Math.min(14, speed * 0.9))) % 6
-  }
-}
-
 export function atlasCell(width, height, index, columns = 4, rows = 4) {
   const x0 = Math.round((index % columns) * width / columns), y0 = Math.round(Math.floor(index / columns) * height / rows)
   return { x: x0, y: y0, w: Math.round((index % columns + 1) * width / columns) - x0, h: Math.round((Math.floor(index / columns) + 1) * height / rows) - y0 }
@@ -53,9 +35,8 @@ export async function loadConceptArt() {
     const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error(`Cannot load ${name}`)); im.src = base + name
   })
   try {
-    const [environment, skyline, courierRig, windbreakerRig, techwearRig] = await Promise.all(['environment-atlas.png', 'skyline.png', 'v2/courier-rig.png', 'v2/windbreaker-rig.png', 'v2/techwear-rig.png'].map(image))
+    const [environment, skyline] = await Promise.all(['environment-atlas.png', 'skyline.png'].map(image))
     art = { kit: frames(environment), skyline }
-    art.rigs = { courier: frames(courierRig, 3, 3), windbreaker: frames(windbreakerRig, 3, 3), techwear: frames(techwearRig, 3, 3) }
     // District colour work happens before gameplay, not on a scrolling frame.
     art.backgrounds = new Map()
     const tints = { 'Kowloon Night': null, 'Acid Rain': '#397251', 'Smog Noon': '#b49351', 'Neon Dusk': '#a1436a', 'Blackout': '#50304a' }

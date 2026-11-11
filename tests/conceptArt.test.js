@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { atlasCell, poseFor, KIT } from '../src/pixel/conceptArt.js'
+import { atlasCell, KIT } from '../src/pixel/conceptArt.js'
 import { decodePng } from '../scripts/png.mjs'
 import { serviceWorker } from '../vite.config.js'
 
@@ -31,37 +31,8 @@ describe('production concept art', () => {
     expect(Object.keys(KIT)).toHaveLength(16)
   })
 
-  it('gives traversal states deliberate poses and loops the run animation', () => {
-    const states = { slide: 8, vault: 9, mantle: 9, climb: 11, wallslide: 10, wallrun: 12, zip: 13, roll: 14, dead: 14, blocked: 15 }
-    for (const [state, frame] of Object.entries(states)) expect(poseFor({ state, speed: 12 }, 2)).toBe(frame)
-    expect(poseFor({ state: 'air', vy: 4 }, 0)).toBe(6)
-    expect(poseFor({ state: 'air', vy: -4 }, 0)).toBe(5)
-    expect(poseFor({ state: 'run', speed: 12 }, 0, true)).toBe(15)
-    const seen = new Set(Array.from({ length: 60 }, (_, i) => poseFor({ state: 'run', speed: 12 }, i / 30)))
-    expect([...seen].sort()).toEqual([0, 1, 2, 3, 4, 5])
-    // Recorded trial ghosts omit live-player speed.
-    expect(poseFor({ state: 'run' }, 1)).toBeGreaterThanOrEqual(0)
-    expect(poseFor({ state: 'run' }, 1)).toBeLessThan(6)
-    expect(poseFor({ state: 'run', speed: NaN }, NaN)).toBe(0)
-  })
-
   it('precaches all production artwork for offline play', () => {
     const sw = serviceWorker('test', [])
-    for (const name of ['environment-atlas.png', 'skyline.png', 'v2/courier-rig.png', 'v2/windbreaker-rig.png', 'v2/techwear-rig.png']) expect(sw).toContain(`concept-art/${name}`)
-  })
-
-  it('ships nine complete transparent rig parts for each outfit', () => {
-    for (const name of ['courier', 'windbreaker', 'techwear']) {
-      const { w, h, rgba } = decodePng(readFileSync(new URL(`../public/concept-art/v2/${name}-rig.png`, import.meta.url)))
-      for (let i = 0; i < 9; i++) {
-        const cell = atlasCell(w, h, i, 3, 3)
-        let opaque = 0, clear = 0
-        for (let y = cell.y; y < cell.y + cell.h; y++) for (let x = cell.x; x < cell.x + cell.w; x++) {
-          if (rgba[(y * w + x) * 4 + 3] > 32) opaque++; else clear++
-        }
-        expect(opaque, `${name} part ${i}`).toBeGreaterThan(500)
-        expect(clear, `${name} part ${i} gutters`).toBeGreaterThan(500)
-      }
-    }
+    for (const name of ['environment-atlas.png', 'skyline.png']) expect(sw).toContain(`concept-art/${name}`)
   })
 })
