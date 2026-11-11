@@ -1,8 +1,8 @@
 # Art-sheet prototype
 
-The runner is now refined by the [v2 model pass](runner-v2.md), with a new
-design sheet, nine separate parts per outfit and consistent anatomy across
-running and traversal. The earlier generated atlases below document v1.
+The runner is now drawn by the [runner rig](runner-rig.md): one skeleton,
+posed live with blended animation, with each outfit a palette on it. The
+generated atlases below document the earlier painted versions.
 
 The default game now draws production artwork based on the approved art sheet.
 This replaces the earlier incremental procedural pass. It runs the existing
@@ -18,11 +18,11 @@ changes from master.
 - The canvas has twice the previous raster resolution in each axis. World
   coordinates and physics stay in the same units; image assets draw into this
   higher-resolution surface with nearest-neighbour sampling.
-- Courier, Windbreaker and Techwear each have a transparent nine-part rig.
-  Running is baked from articulated limbs into 64 registered frames per outfit;
-  sixteen traversal poses use the same anatomical dimensions and cover airborne movement,
-  sliding, vaulting, hanging, climbing, wall-running, ziplines, rolls and idle.
-  Ghosts use the same production artwork with a cyan treatment.
+- Courier, Windbreaker and Techwear are palettes on one rigged skeleton
+  ([runner rig](runner-rig.md)). Every move is posed live and crossfaded:
+  running, airborne movement, sliding, vaulting, mantling, hanging, climbing,
+  wall-running, ziplines, rolls, stumbles and idle. Ghosts use the same rig
+  with a cyan treatment.
 - Running phase follows distance travelled. Both feet alternate, planted feet
   track the roof, and each contact drives the footstep sound. Focus and pause
   use the same phase as the visible sprite. See [the gait fix](run-gait.md).
