@@ -107,9 +107,15 @@ export const CLIPS = {
     [1, { lean: -0.12, chest: -0.04, head: 0.05, nThigh: 1.35, nKnee: 1.75, nFoot: 0.3, fThigh: 1.0, fKnee: 1.6, fFoot: 0.4, nArm: 2.88, nElbow: 0.18, nWrist: 0.1, fArm: 3.02, fElbow: 0.24, fWrist: 0.1 }],
   ], { loop: true, register: 'hands' }),
 
-  // A tight ball. The animator spins it once per roll.
+  // A parkour roll by progress, turning once at the steady rate the body
+  // covers ground: land in a deep crouch reaching for the roof (0), tuck
+  // tight and go over (0.22..0.78), come up onto the feet already leaning
+  // into the run (1). `spin` turns the whole pose about its middle.
   roll: clip([
-    [0, { lean: 1.25, chest: 0.45, head: 1.6, nThigh: 2.2, nKnee: 2.5, nFoot: 0.9, fThigh: 1.95, fKnee: 2.45, fFoot: 1.0, nArm: 1.25, nElbow: 1.9, fArm: 1.0, fElbow: 2.1 }],
+    [0, { spin: 0, lean: 0.7, chest: 0.2, head: 0.55, nThigh: 1.5, nKnee: 2.0, nFoot: 0.2, fThigh: 1.3, fKnee: 1.9, fFoot: 0.3, nArm: 0.7, nElbow: 0.3, fArm: 0.9, fElbow: 0.3 }],
+    [0.22, { spin: TAU * 0.22, lean: 1.0, chest: 0.45, head: 1.55, nThigh: 2.1, nKnee: 2.5, nFoot: 0.6, fThigh: 1.95, fKnee: 2.45, fFoot: 0.7, nArm: 0.25, nElbow: 1.05, nWrist: 0.3, fArm: 0.05, fElbow: 1.25, fWrist: 0.3 }],
+    [0.78, { spin: TAU * 0.78, lean: 1.0, chest: 0.45, head: 1.55, nThigh: 2.1, nKnee: 2.5, nFoot: 0.6, fThigh: 1.95, fKnee: 2.45, fFoot: 0.7, nArm: 0.25, nElbow: 1.05, nWrist: 0.3, fArm: 0.05, fElbow: 1.25, fWrist: 0.3 }],
+    [1, { spin: TAU, lean: 0.55, chest: 0.12, head: 0.3, nThigh: 1.25, nKnee: 1.7, nFoot: 0.25, fThigh: 0.35, fKnee: 1.25, fFoot: 0.55, nArm: -0.3, nElbow: 1.2, fArm: 0.8, fElbow: 1.2 }],
   ], { register: 'none' }),
 
   // A trip: pitch forward, arms out, catch it, run again.
@@ -216,10 +222,8 @@ export function sampleState(name, p, ctx, out = {}) {
     case 'stumble': return registered('stumble', t / PHYS.STUMBLE_TIME, out)
     case 'dead': return registered('dead', t / 0.35, out)
     case 'roll': {
-      sample(CLIPS.roll, 0, out)
-      // Exactly one turn per roll, quick in the middle, eased at both ends.
       // The ball stays on the roof whichever way up it is.
-      out.spin = TAU * ease(t / PHYS.ROLL_TIME)
+      sample(CLIPS.roll, t / PHYS.ROLL_TIME, out)
       return Object.assign(out, ground(out))
     }
   }

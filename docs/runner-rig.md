@@ -33,7 +33,8 @@ when solved, so no blend can bend a joint backwards.
 Catmull-Rom spline, so motion carries its speed through each key instead of
 stopping on it. Clips are timed by what the simulation knows: vault and
 mantle by kinematic progress, air poses by vertical speed, roll by its
-duration (exactly one turn about the body's centre, kept on the roof), climb
+duration (crouch, tuck and come up running, turning once at a steady rate
+about the body's centre and kept on the roof), climb
 and zip as loops. The run is not keyed. It converts the existing gait's
 planted-foot IK into joint angles, so footsteps, sounds and the visible
 contact stay in lockstep.
