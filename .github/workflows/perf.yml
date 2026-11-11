@@ -27,6 +27,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: node bench/concept-verify.js
+      - run: node bench/gait-review.js
       - name: Capture matching base and proposed game frames
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -41,6 +42,7 @@ jobs:
           path: |
             docs/screenshots/courier-pass/*.png
             docs/screenshots/concept/*.png
+            docs/screenshots/gait/*.png
   bench:
     runs-on: ubuntu-24.04
     steps:
