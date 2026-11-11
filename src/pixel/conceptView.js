@@ -193,16 +193,16 @@ export class ConceptView extends PixelView {
   }
 
   // A light's reflection on the roof under it: a streak of its own colour,
-  // broken where the paving is rough, strong on a wet roof and faint on a dry one.
-  reflect(ctx, seed, x, w, color, strength) {
+  // broken where the paving is rough, strong on a wet roof and faint on a
+  // dry one. Painted into `overlay`, the roof's one-pixel-per-unit light layer.
+  reflect(overlay, seed, x, w, color, strength) {
     if (strength < 0.02) return
     for (let i = 0; i < w; i++) {
       const edge = Math.min(1, Math.min(i, w - 1 - i) / (w * 0.28) + 0.15)
       const column = (0.35 + 0.65 * hash(seed, Math.floor((x + i) / 2), 91)) * edge * strength
       for (let row = 1; row < 12; row++) {
         if (hash(seed, x + i, 92 + row) < 0.22) continue
-        ctx.fillStyle = css(color, column * (1 - row / 15))
-        ctx.fillRect(x + i, row, 1, 1)
+        overlay.add(x + i, row, color, column * (1 - row / 15))
       }
     }
   }
@@ -311,22 +311,35 @@ export class ConceptView extends PixelView {
     }
     const wet = this.weather.wet
     if (wet < 0.3) { ctx.fillStyle = css(pal.roof, 0.45); ctx.fillRect(0, 1, w, 11) }
+    // Everything laid over the paving goes into one small image, composited
+    // in a single draw however many patches and lights the roof has.
+    const overlay = new ImageData(w, 13), px = overlay.data
+    overlay.add = (ox, oy, color, alpha) => {
+      if (ox < 0 || ox >= w || oy < 0 || oy >= 13 || alpha <= 0) return
+      const i = (oy * w + ox) * 4, a0 = px[i + 3] / 255, a = alpha + a0 * (1 - alpha)
+      for (let k = 0; k < 3; k++) px[i + k] = (color[k] * alpha + px[i + k] * a0 * (1 - alpha)) / a
+      px[i + 3] = a * 255
+    }
     // Worn patches and standing water, placed per building.
+    const sheen = mix(pal.haze, [200, 205, 225], 0.4)
     for (let i = 0, n = Math.floor(w / 70); i < n; i++) {
       const bx = Math.floor(hash(c.seed, i, 63) * w), bw = 10 + Math.floor(hash(c.seed, i, 64) * 26), by = 2 + Math.floor(hash(c.seed, i, 65) * 7)
-      ctx.fillStyle = hash(c.seed, i, 66) < 0.5 ? '#0b081a40' : css(mix(pal.haze, [200, 205, 225], 0.4), 0.05 + wet * 0.12)
-      ctx.fillRect(bx, by, bw, 2); ctx.fillRect(bx + 3, by + 2, Math.max(2, bw - 8), 1)
+      const worn = hash(c.seed, i, 66) < 0.5, color = worn ? [11, 8, 26] : sheen, alpha = worn ? 0.25 : 0.05 + wet * 0.12
+      for (let k = 0; k < bw; k++) { overlay.add(bx + k, by, color, alpha); overlay.add(bx + k, by + 1, color, alpha); if (k >= 3 && k < bw - 5) overlay.add(bx + k, by + 2, color, alpha) }
     }
     // Reflections come from the lights standing on this roof: each billboard
     // in its own colour, and the warm lamps over it.
     const gloss = 0.16 + wet * 0.6
     for (const item of this.decorFor(c, w)) {
       if (item.id !== 'sign') continue
-      this.reflect(ctx, c.seed, item.x + 4, item.w - 8, item.color, gloss)
-      this.reflect(ctx, c.seed + 1, item.x + Math.round(item.w * 0.2), 5, [255, 200, 120], gloss * 0.8)
-      this.reflect(ctx, c.seed + 2, item.x + Math.round(item.w * 0.68), 5, [255, 200, 120], gloss * 0.8)
+      this.reflect(overlay, c.seed, item.x + 4, item.w - 8, item.color, gloss)
+      this.reflect(overlay, c.seed + 1, item.x + Math.round(item.w * 0.2), 5, [255, 200, 120], gloss * 0.8)
+      this.reflect(overlay, c.seed + 2, item.x + Math.round(item.w * 0.68), 5, [255, 200, 120], gloss * 0.8)
     }
-    if (pal.moon && wet > 0.2) this.reflect(ctx, c.seed + 3, Math.floor(hash(c.seed, 67) * Math.max(1, w - 30)), 22, [200, 220, 235], wet * 0.16)
+    if (pal.moon && wet > 0.2) this.reflect(overlay, c.seed + 3, Math.floor(hash(c.seed, 67) * Math.max(1, w - 30)), 22, [200, 220, 235], wet * 0.16)
+    const lit = document.createElement('canvas'); lit.width = w; lit.height = 13
+    lit.getContext('2d').putImageData(overlay, 0, 0)
+    ctx.drawImage(lit, 0, 0, w, 13); lit.width = lit.height = 0
     ctx.fillStyle = '#120e22'; ctx.fillRect(0, 13, w, 3)
     ctx.fillStyle = '#b5a5c0'; ctx.fillRect(0, 12, w, 1)
     ctx.fillStyle = '#8c7e9d'; ctx.fillRect(0, 0, w, 1)
