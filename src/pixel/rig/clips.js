@@ -141,19 +141,25 @@ export function runChannels(phase, pace = 0.5, out = {}) {
   const g = runPose(phase), t = wrap(phase)
   const legOf = l => legAngles(g.hip, l.ankle)
   const n = legOf(g.near), f = legOf(g.far)
-  const swing = g.arm * (0.82 + 0.3 * pace)
-  // A forward swing folds the elbow and brings the fist up; a back swing
-  // opens it slightly. The fist stays a straight continuation of the wrist.
-  const elbow = a => 1.38 + 0.32 * a
+  const swing = g.arm * (0.86 + 0.34 * pace)
+  // The arm is not a pendulum: driving forward it folds tight and the fist
+  // comes up to the chin; behind the body it opens and trails. The elbow
+  // leads the swing by a little, so the forearm visibly whips through.
+  const whip = Math.cos(t * TAU - 0.55)
+  const elbow = (a, dir) => 1.32 + 0.5 * a + 0.16 * dir * whip
+  const wrist = (a, dir) => 0.05 - 0.22 * dir * whip
+  // The ribcage twists against the hips once per stride and the head stays
+  // level over it; twice per stride the chest gives with each footfall.
+  const twist = Math.sin(t * TAU - 0.4), give = Math.sin(t * TAU * 2 + 0.6)
   Object.assign(out, pose({
     x: g.hip[0], y: g.hip[1],
-    lean: g.lean - 0.02 + 0.09 * pace,
-    chest: 0.02 + 0.025 * Math.sin(t * TAU * 2 + 0.6),
-    head: 0.02 - 0.03 * pace,
+    lean: g.lean - 0.02 + 0.09 * pace + 0.02 * give,
+    chest: 0.03 + 0.06 * twist + 0.035 * give,
+    head: 0.02 - 0.03 * pace - 0.035 * twist + 0.03 * give,
     nThigh: n.thigh, nKnee: n.knee, nFoot: g.near.tilt,
     fThigh: f.thigh, fKnee: f.knee, fFoot: g.far.tilt,
-    nArm: swing, nElbow: elbow(swing), nWrist: 0.05,
-    fArm: -swing, fElbow: elbow(-swing), fWrist: 0.05,
+    nArm: swing, nElbow: elbow(swing, 1), nWrist: wrist(swing, 1),
+    fArm: -swing, fElbow: elbow(-swing, -1), fWrist: wrist(-swing, -1),
   }))
   return out
 }
@@ -205,7 +211,15 @@ export function sampleState(name, p, ctx, out = {}) {
     case 'brace': return registered('brace', ctx.time / 2.2, out)
     case 'air': {
       const vy = Number.isFinite(p.vy) ? p.vy : 0
-      return registered('air', clamp01((vy + 11) / 18), out)
+      sample(CLIPS.air, clamp01((vy + 11) / 18), out)
+      // Nobody holds a pose in the air: the legs keep working and the arms
+      // feel for balance.
+      const w = ctx.time * 7
+      out.nThigh += 0.1 * Math.sin(w); out.fThigh -= 0.1 * Math.sin(w)
+      out.nKnee += 0.14 * Math.sin(w + 1.1); out.fKnee += 0.14 * Math.sin(w + 2.6)
+      out.nArm += 0.12 * Math.sin(w * 0.7 + 0.5); out.fArm -= 0.12 * Math.sin(w * 0.7 + 1.4)
+      out.chest += 0.03 * Math.sin(w * 0.5)
+      return Object.assign(out, ground(out))
     }
     case 'slide': {
       // The settled pose shudders as it skids, so a long slide is never frozen.

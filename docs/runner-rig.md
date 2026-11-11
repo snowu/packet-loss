@@ -46,6 +46,14 @@ five-segment spring chain driven by the body's real motion, and the painted
 ponytail is laid along it, so it streams back at speed, lifts when falling
 and whips through rolls.
 
+**Follow-through.** The chest, head, elbows and wrists do not track the pose
+directly. Each chases it on a damped spring (`FOLLOW` in `animator.js`), so
+they arrive a beat late and overshoot a little whenever the body changes
+what it is doing. The torso also tips with acceleration, forward when
+speeding up and back when braking. In the run the ribcage twists against the
+hips, the chest gives with each footfall, and the forearm whips through the
+swing; in the air the legs keep working and the arms feel for balance.
+
 **Drawing.** Each outfit is a transparent 3×3 sheet of nine parts, in
 reading order: head, torso, ponytail; upper arm, forearm, fist; thigh, shin,
 shoe. `parts.js` binds each part to its bone at fixed landmarks (`BIND`),
