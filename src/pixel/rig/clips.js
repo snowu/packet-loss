@@ -56,19 +56,26 @@ export const CLIPS = {
     [1, { lean: 0.18, chest: 0.05, head: 0.02, nThigh: 1.3, nKnee: 1.7, nFoot: 0.45, fThigh: -0.42, fKnee: 0.75, fFoot: 0.7, nArm: -0.65, nElbow: 1.45, fArm: 1.95, fElbow: 0.55, fWrist: -0.2 }],
   ]),
 
-  // Feet-first slide: drop (0), settled and reclined (0.25..1).
+  // Feet-first slide, low enough to pass under a pipe: drop onto the hip (0),
+  // then skim with the lead leg out, the other knee up, a hand trailing.
   slide: clip([
-    [0, { x: -1, lean: -0.55, chest: 0.25, head: -0.25, nThigh: 1.15, nKnee: 0.5, nFoot: -0.3, fThigh: 0.9, fKnee: 1.2, fFoot: 0.1, nArm: -0.55, nElbow: 0.5, fArm: 1.0, fElbow: 1.0 }],
-    [0.25, { x: -3, lean: -1.1, chest: 0.32, head: -0.55, nThigh: 1.45, nKnee: 0.06, nFoot: -0.55, fThigh: 1.2, fKnee: 0.95, fFoot: -0.05, nArm: -0.5, nElbow: 0.2, nWrist: -0.5, fArm: 0.9, fElbow: 1.35 }],
-    [1, { x: -3, lean: -1.14, chest: 0.34, head: -0.58, nThigh: 1.46, nKnee: 0.04, nFoot: -0.58, fThigh: 1.22, fKnee: 0.98, fFoot: -0.05, nArm: -0.48, nElbow: 0.2, nWrist: -0.5, fArm: 0.86, fElbow: 1.4 }],
+    [0, { x: -1, lean: -0.5, chest: 0.2, head: -0.2, nThigh: 1.25, nKnee: 0.7, nFoot: -0.5, fThigh: 1.0, fKnee: 1.5, fFoot: -0.1, nArm: -0.7, nElbow: 0.5, fArm: 1.0, fElbow: 0.9 }],
+    [0.16, { x: -4, lean: -1.2, chest: 0.24, head: -0.42, nThigh: 1.6, nKnee: 0.1, nFoot: -1.05, fThigh: 1.72, fKnee: 0.8, fFoot: -0.55, nArm: -1.18, nElbow: 0.18, nWrist: -0.4, fArm: 1.25, fElbow: 0.7 }],
+    [0.6, { x: -4.5, lean: -1.26, chest: 0.26, head: -0.46, nThigh: 1.63, nKnee: 0.06, nFoot: -1.1, fThigh: 1.78, fKnee: 0.9, fFoot: -0.6, nArm: -1.2, nElbow: 0.14, nWrist: -0.4, fArm: 1.15, fElbow: 0.8 }],
+    [1, { x: -4.5, lean: -1.24, chest: 0.26, head: -0.45, nThigh: 1.62, nKnee: 0.08, nFoot: -1.1, fThigh: 1.76, fKnee: 0.86, fFoot: -0.6, nArm: -1.2, nElbow: 0.15, nWrist: -0.4, fArm: 1.18, fElbow: 0.78 }],
   ]),
 
-  // Speed vault by progress: hand plant, legs tucked over, reach for landing.
+  // Vault by progress: drive the lead knee and reach for the obstacle (0),
+  // plant a hand on it and swing both legs over ahead of the body, sitting
+  // back onto the arm (0.34..0.6), push off and drop the feet (0.82), land
+  // running (1). The lowest point is registered to the simulation's arc, so
+  // the planted hand rides the top of the obstacle.
   vault: clip([
-    [0, { lean: 0.45, chest: 0.1, head: 0.05, nThigh: 1.2, nKnee: 1.5, nFoot: 0.4, fThigh: 0.2, fKnee: 1.2, fFoot: 0.6, nArm: 0.45, nElbow: 0.2, nWrist: -1.0, fArm: 1.1, fElbow: 0.7 }],
-    [0.4, { lean: 0.55, chest: 0.12, head: 0.1, nThigh: 1.65, nKnee: 1.7, nFoot: 0.3, fThigh: 1.4, fKnee: 1.9, fFoot: 0.4, nArm: 0.05, nElbow: 0.05, nWrist: -1.2, fArm: 0.9, fElbow: 0.9 }],
-    [0.75, { lean: 0.3, chest: 0.06, head: 0.0, nThigh: 1.15, nKnee: 0.9, nFoot: 0.2, fThigh: 0.75, fKnee: 1.5, fFoot: 0.4, nArm: -0.5, nElbow: 0.9, fArm: 1.4, fElbow: 0.6 }],
-    [1, { lean: 0.2, chest: 0.03, head: 0.0, nThigh: 0.6, nKnee: 0.6, nFoot: 0.15, fThigh: -0.15, fKnee: 0.65, fFoot: 0.4, nArm: -0.4, nElbow: 1.3, fArm: 0.9, fElbow: 1.1 }],
+    [0, { lean: 0.38, chest: 0.08, head: 0.05, nThigh: -0.35, nKnee: 0.35, nFoot: 0.5, fThigh: 1.25, fKnee: 1.3, fFoot: 0.3, nArm: 0.95, nElbow: 0.25, nWrist: -0.4, fArm: -0.7, fElbow: 0.9 }],
+    [0.34, { lean: -0.12, chest: 0.12, head: 0.0, nThigh: 1.45, nKnee: 0.55, nFoot: -0.5, fThigh: 1.75, fKnee: 0.75, fFoot: -0.5, nArm: 0.3, nElbow: 0.05, nWrist: -1.3, fArm: 1.1, fElbow: 0.8 }],
+    [0.6, { lean: -0.32, chest: 0.16, head: -0.05, nThigh: 1.62, nKnee: 0.2, nFoot: -0.7, fThigh: 1.8, fKnee: 0.45, fFoot: -0.6, nArm: -0.35, nElbow: 0.05, nWrist: -0.9, fArm: 1.45, fElbow: 0.5 }],
+    [0.82, { lean: 0.08, chest: 0.08, head: 0.0, nThigh: 0.75, nKnee: 0.8, nFoot: 0.0, fThigh: 1.15, fKnee: 0.35, fFoot: -0.2, nArm: -0.9, nElbow: 0.4, nWrist: -0.3, fArm: 1.0, fElbow: 0.9 }],
+    [1, { lean: 0.2, chest: 0.03, head: 0.0, nThigh: -0.15, nKnee: 0.65, nFoot: 0.4, fThigh: 0.6, fKnee: 0.5, fFoot: 0.1, nArm: -0.4, nElbow: 1.3, fArm: 0.9, fElbow: 1.1 }],
   ]),
 
   // Ledge mantle by progress: hang, pull, press over, step through.
@@ -163,6 +170,21 @@ export function clipFor(p, idle) {
   }
 }
 
+// Where a vault is in its clip. The hand plant is keyed to the obstacle, not
+// the clock: approach until the body reaches its near face (0..PLANT), cross
+// it on the hand (PLANT..RELEASE), then come off the far side (RELEASE..1).
+// Ghosts carry no obstacle, so they fall back to plain progress.
+const PLANT = 0.34, RELEASE = 0.6
+function vaultTime(p) {
+  const k = p.kin, u = progress(p, 0.3)
+  if (!k || !(k.x1 > k.x0) || !(k.ex > k.sx)) return u
+  const x = k.sx + (k.ex - k.sx) * u, reach = PHYS.W / 2 + 0.25
+  const a = Math.max(k.sx + 0.05, k.x0 - reach), b = Math.min(k.ex - 0.05, Math.max(a + 0.1, k.x1 - reach))
+  if (x < a) return PLANT * ease((x - k.sx) / (a - k.sx))
+  if (x < b) return PLANT + (RELEASE - PLANT) * (x - a) / (b - a)
+  return RELEASE + (1 - RELEASE) * (x - b) / (k.ex - b)
+}
+
 export function sampleState(name, p, ctx, out = {}) {
   const t = Number.isFinite(p.t) ? p.t : 0
   switch (name) {
@@ -179,8 +201,14 @@ export function sampleState(name, p, ctx, out = {}) {
       const vy = Number.isFinite(p.vy) ? p.vy : 0
       return registered('air', clamp01((vy + 11) / 18), out)
     }
-    case 'slide': return registered('slide', t / PHYS.SLIDE_TIME, out)
-    case 'vault': return registered('vault', ease(progress(p, 0.3)), out)
+    case 'slide': {
+      // The settled pose shudders as it skids, so a long slide is never frozen.
+      sample(CLIPS.slide, t / PHYS.SLIDE_TIME, out)
+      const skid = clamp01(t / 0.12) * 0.022
+      out.lean += skid * Math.sin(ctx.time * 41); out.nThigh += skid * Math.sin(ctx.time * 33 + 1); out.fKnee += skid * 2 * Math.sin(ctx.time * 27 + 2)
+      return Object.assign(out, ground(out))
+    }
+    case 'vault': return registered('vault', vaultTime(p), out)
     case 'mantle': return registered('mantle', progress(p, PHYS.MANTLE_TIME), out)
     case 'climb': return registered('climb', t / 0.42, out)
     case 'wallslide': return registered('wallslide', t / 1.6, out)

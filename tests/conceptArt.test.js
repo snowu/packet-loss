@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { atlasCell, KIT } from '../src/pixel/conceptArt.js'
+import { atlasCell, trimSlivers, KIT } from '../src/pixel/conceptArt.js'
 import { decodePng } from '../scripts/png.mjs'
 import { serviceWorker } from '../vite.config.js'
 import { SKINS } from '../src/pixel/rig/skins.js'
@@ -30,6 +30,20 @@ describe('production concept art', () => {
       }
     }
     expect(Object.keys(KIT)).toHaveLength(16)
+  })
+
+  it('trims a neighbouring sprite\'s bleed from a cell, and nothing else', () => {
+    const used = (...runs) => { const u = new Uint32Array(100); for (const [a, b] of runs) u.fill(1, a, b + 1); return u }
+    expect(trimSlivers(used([0, 1], [30, 90]))).toEqual([30, 90])   // bleed at the top edge
+    expect(trimSlivers(used([10, 70], [98, 99]))).toEqual([10, 70]) // and at the bottom
+    expect(trimSlivers(used([3, 4], [30, 90]))).toEqual([3, 90])    // detail away from the edge stays
+    expect(trimSlivers(used([0, 20], [30, 90]))).toEqual([0, 90])   // a real part stays
+    expect(trimSlivers(used([0, 1], [3, 90]))).toEqual([0, 90])     // no clear gap: one sprite
+    // The crate fills its cell's box, so it is drawn as tall as it collides.
+    const { w, h, rgba } = decodePng(readFileSync(new URL('../public/concept-art/environment-atlas.png', import.meta.url)))
+    const c = atlasCell(w, h, KIT.crate), rows = new Uint32Array(c.h)
+    for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (rgba[((c.y + y) * w + c.x + x) * 4 + 3] >= 32) rows[y]++
+    expect(trimSlivers(rows)[0]).toBeGreaterThan(50)
   })
 
   it('precaches all production artwork for offline play', () => {

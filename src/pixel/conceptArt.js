@@ -11,6 +11,27 @@ export function atlasCell(width, height, index, columns = 4, rows = 4) {
   return { x: x0, y: y0, w: Math.round((index % columns + 1) * width / columns) - x0, h: Math.round((Math.floor(index / columns) + 1) * height / rows) - y0 }
 }
 
+// First and last used index along one axis of a cell. A thin strip of a
+// neighbouring sprite that bled over the cell's edge, with clear space
+// between it and the real sprite, is not part of the sprite: keeping it
+// would squash the artwork into part of the box it is drawn in.
+export function trimSlivers(used) {
+  const n = used.length, thin = Math.max(2, Math.round(n * 0.06)), gap = Math.max(2, Math.round(n * 0.03))
+  let a = 0, b = n - 1
+  while (a <= b && !used[a]) a++
+  while (b >= a && !used[b]) b--
+  const skip = (from, step) => {
+    let end = from
+    while (end !== (step > 0 ? b : a) && used[end + step]) end += step
+    if (Math.abs(end - from) + 1 > thin || (from !== 0 && from !== n - 1)) return from
+    let next = end + step, clear = 0
+    while (next >= a && next <= b && !used[next]) { next += step; clear++ }
+    return clear >= gap && next >= a && next <= b ? next : from
+  }
+  a = skip(a, 1); b = skip(b, -1)
+  return [a, b]
+}
+
 function frames(image, columns = 4, rows = 4) {
   const cv = document.createElement('canvas')
   cv.width = image.width; cv.height = image.height
@@ -18,11 +39,13 @@ function frames(image, columns = 4, rows = 4) {
   const rgba = c.getImageData(0, 0, cv.width, cv.height).data
   return Array.from({ length: columns * rows }, (_, i) => {
     const cell = atlasCell(cv.width, cv.height, i, columns, rows)
-    let left = cell.w, top = cell.h, right = -1, bottom = -1
+    // Opaque pixels per row and column of the cell.
+    const rowsUsed = new Uint32Array(cell.h), colsUsed = new Uint32Array(cell.w)
     for (let y = 0; y < cell.h; y++) for (let x = 0; x < cell.w; x++) {
       if (rgba[((cell.y + y) * cv.width + cell.x + x) * 4 + 3] < 32) continue
-      left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y)
+      rowsUsed[y]++; colsUsed[x]++
     }
+    const [top, bottom] = trimSlivers(rowsUsed), [left, right] = trimSlivers(colsUsed)
     if (right < left) throw new Error(`Empty concept atlas cell ${i}`)
     const frame = document.createElement('canvas')
     frame.width = right - left + 1; frame.height = bottom - top + 1

@@ -2,7 +2,7 @@
 // States crossfade instead of cutting, landings squash through the legs with
 // the feet held in place, and the ponytail is a damped spring chain driven by
 // the body's real motion. Nothing here depends on the outfit.
-import { CHANNELS, pose, solve, crouch, at } from './skeleton.js'
+import { CHANNELS, pose, solve, crouch, at, bottomOf } from './skeleton.js'
 import { clipFor, sampleState } from './clips.js'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -120,6 +120,14 @@ export class Animator {
     if (!this.blendDur || this.blendT >= this.blendDur) this.out.spin = wrapPi(this.out.spin)
 
     this.joints = solve(this.out)
+    // Each clip stands on the roof, but a pose halfway between two of them
+    // may not: ease it out as the blend proceeds rather than let a foot dip
+    // through, without snapping a pose that started below the line (a zipline).
+    if (name !== 'air' && name !== 'zip') {
+      const sunk = bottomOf(this.joints)
+      const settled = this.blendDur ? Math.min(1, 2 * smooth(this.blendT / this.blendDur)) : 1
+      if (sunk > 0) { this.out.y -= sunk * settled; this.joints = solve(this.out) }
+    }
     this.hair.update(dt, at(this.joints.head, ...HAIR_TIE), this.motion)
     this.hairPoints = this.hair.points(at(this.joints.head, ...HAIR_TIE))
     return this.out
