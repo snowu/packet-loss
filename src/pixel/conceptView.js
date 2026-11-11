@@ -5,7 +5,7 @@ import { css, hash, mix } from './pixels.js'
 import { PPU } from './sprites.js'
 import { FocusFilter } from './focus.js'
 import { RunGait, RUN_STRIDE, STANCE, runFrame } from './runGait.js'
-import { bakeRunFrames, RUN_ORIGIN } from './runRig.js'
+import { bakeRunner, RUN_ORIGIN } from './runRig.js'
 
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -18,7 +18,9 @@ export class ConceptView extends PixelView {
     this.art = conceptArt()
     this.gait = new RunGait()
     this.ghostGait = new RunGait()
-    this.runFrames = Object.fromEntries(Object.entries(this.art.rigs).map(([name, parts]) => [name, bakeRunFrames(parts)]))
+    const runners = Object.fromEntries(Object.entries(this.art.rigs).map(([name, parts]) => [name, bakeRunner(parts)]))
+    this.runFrames = Object.fromEntries(Object.entries(runners).map(([name, runner]) => [name, runner.run]))
+    this.preparedActors = Object.fromEntries(Object.entries(runners).map(([name, runner]) => [name, runner.traversal]))
     this.backgrounds = new Map()
     this.materials = new Map()
     this.kitCache = new Map()
@@ -31,14 +33,6 @@ export class ConceptView extends PixelView {
     const roof = this.art.kit[KIT.roof], sy = Math.floor(roof.height * 0.64)
     const roofCtx = this.roofTile.getContext('2d'); roofCtx.imageSmoothingEnabled = false
     roofCtx.drawImage(roof, 0, sy, roof.width, roof.height - sy, 0, 0, 190, 26)
-    this.preparedActors = Object.fromEntries(Object.entries(this.art.outfits).map(([name, frames]) => [name, frames.map(im => {
-      const cv = document.createElement('canvas')
-      const scale = 37 / Math.max(...frames.slice(0, 6).map(c => c.height), frames[15].height)
-      cv.width = Math.max(1, Math.round(im.width * scale * 2))
-      cv.height = Math.max(1, Math.round(im.height * scale * 2))
-      const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(im, 0, 0, cv.width, cv.height)
-      return cv
-    })]))
     document.body.classList.add('concept-art')
   }
 
@@ -292,9 +286,9 @@ export class ConceptView extends PixelView {
     if (ghost) ctx.globalAlpha *= 0.5
     if (ghost) ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)'
     if (p.state === 'roll') {
-      ctx.translate(x, y - h / 2); ctx.rotate((p.t ?? time) * 12)
-      ctx.drawImage(im, -w / 2, -h / 2, w, h)
-    } else ctx.drawImage(im, Math.round(x - w * (index === 8 ? 0.38 : 0.54)), Math.round(y - h), Math.round(w), Math.round(h))
+      ctx.translate(x, y - im.poseHeight / 2); ctx.rotate((p.t ?? time) * 12)
+      ctx.drawImage(im, -RUN_ORIGIN[0] - im.rollPivot[0], -RUN_ORIGIN[1] - im.rollPivot[1], w, h)
+    } else ctx.drawImage(im, x - RUN_ORIGIN[0], y - RUN_ORIGIN[1], w, h)
     ctx.restore()
   }
 

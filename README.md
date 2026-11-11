@@ -68,7 +68,7 @@ Two pieces from the same maker (stacks count) switch on that maker's set:
 
 ## Look
 
-The default renderer uses the approved art-sheet design: three animated character atlases, a detailed rooftop kit, textured facades and roofs, and a scrolling cyberpunk skyline on a canvas with twice the previous raster resolution in each axis. Red marks traversal, magenta marks security, and cyan marks data. Heist, Endless and Trials use the same movement simulation, with all five district treatments, rain, focus and ghost playback.
+The default renderer uses the approved art-sheet design: three articulated character rigs, a detailed rooftop kit, textured facades and roofs, and a scrolling cyberpunk skyline on a canvas with twice the previous raster resolution in each axis. The [v2 runner models](docs/runner-v2.md) use new artwork and shared proportions across running and traversal. Red marks traversal, magenta marks security, and cyan marks data. Heist, Endless and Trials use the same movement simulation, with all five district treatments, rain, focus and ghost playback.
 
 See [the art-sheet prototype](docs/concept-art.md) for actual gameplay captures, production poses, asset sources and validation. Add `?art=legacy` to compare with the original procedural renderer. The original renderer and its skeletal runner also remain the automatic fallback when production artwork cannot load.
 

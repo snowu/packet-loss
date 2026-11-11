@@ -1,170 +1,112 @@
-import { RUN_FRAMES, runPose, SHOE } from './runGait.js'
+import { RUN_FRAMES, runPose } from './runGait.js'
+import { MODEL, SHOE, FRAME, PART, shoulderAt, armPose, traversalPose, rotatePoint, addPoint } from './runnerModel.js'
+export { shoulderAt, armPose } from './runnerModel.js'
+export const RUN_ORIGIN = FRAME.origin
+export const ARM = Object.freeze({ upper: MODEL.upper, fore: MODEL.fore, hand: MODEL.hand })
 
-// Pivots are fractions of each trimmed cutout: shoulder/elbow, hip/knee,
-// knee/ankle. The same registered kit is used by all three outfits.
-const JOINTS = [null, [[0.48, 0.14], [0.47, 0.875]], [[0.42, 0.10], [0.45, 0.69]], [[0.38, 0.095], [0.77, 0.84]], [[0.61, 0.11], [0.46, 0.93]]]
-export const TORSO = Object.freeze({ height: 21, hip: [0.715, 0.905], shoulder: [0.61, 0.555] })
-export const ARM = Object.freeze({ upper: 5.9, fore: 4.9, hand: 2.4 })
-export const RUN_ORIGIN = [28, 45]
+// Landmarks in the NEW trimmed nine-part kit. Head, torso, ponytail and fist
+// are independent images, so proportions never depend on their crop margins.
+const BIND = {
+  [PART.torso]: { a: [0.52, 0.87], b: [0.25, 0.18], width: 6.6 },
+  [PART.upper]: { a: [0.64, 0.14], b: [0.34, 0.91], width: 2.4 },
+  [PART.fore]: { a: [0.52, 0.08], b: [0.55, 0.94], width: 1.8 },
+  [PART.hand]: { a: [0.43, 0.16], b: [0.52, 0.80], width: 2.1 },
+  [PART.thigh]: { a: [0.52, 0.07], b: [0.46, 0.94], width: 3.6 },
+  [PART.shin]: { a: [0.76, 0.12], b: [0.40, 0.93], width: 2.9 },
+}
+export const HEAD_BIND = Object.freeze({ neck: [0.43, 0.94], tie: [0.15, 0.29] })
+export const HAIR_BIND = Object.freeze([0.93, 0.23])
 
-// Tail motion is baked with the gait. The tie stays attached to the head;
-// progressively delayed motion toward the tips makes a soft travelling wave.
 export function hairOffset(phase, distance) {
   const d = Math.max(0, Math.min(1, distance)), t = phase * Math.PI * 2
   if (d === 0) return 0
-  return d ** 1.5 * (1.05 * Math.sin(t * 2 - d * 2.4) + 0.3 * Math.sin(t - d * 1.2))
+  return d ** 1.5 * (0.5 * Math.sin(t * 2 - d * 2.4) + 0.15 * Math.sin(t - d * 1.2))
 }
 
-function tailMask(ctx, w, h) {
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w * 0.64, 0); ctx.lineTo(w * 0.64, h * 0.10)
-  ctx.bezierCurveTo(w * 0.64, h * 0.16, w * 0.62, h * 0.19, w * 0.59, h * 0.28)
-  ctx.bezierCurveTo(w * 0.56, h * 0.37, w * 0.49, h * 0.42, w * 0.43, h * 0.46)
-  ctx.bezierCurveTo(w * 0.40, h * 0.49, w * 0.40, h * 0.52, w * 0.35, h * 0.53)
-  ctx.lineTo(0, h * 0.53); ctx.closePath()
-}
+function canvas(w, h) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv }
 
-function isolateTail(mask, source, width, height) {
-  // The scarf can enter the ponytail's bounding area. Keep the largest
-  // connected silhouette inside the mask so detached cloth stays on the body.
-  const count = width * height, visited = new Uint8Array(count), queue = new Uint32Array(count)
-  const inside = i => mask[i * 4 + 3] >= 128 && source[i * 4 + 3] >= 32
-  let largest = new Uint32Array(0)
-  for (let start = 0; start < count; start++) {
-    if (visited[start] || !inside(start)) continue
-    let head = 0, size = 1; queue[0] = start; visited[start] = 1
-    while (head < size) {
-      const i = queue[head++], x = i % width, y = Math.floor(i / width)
-      for (const next of [x > 0 ? i - 1 : -1, x + 1 < width ? i + 1 : -1, y > 0 ? i - width : -1, y + 1 < height ? i + width : -1]) {
-        if (next < 0 || visited[next] || !inside(next)) continue
-        visited[next] = 1; queue[size++] = next
-      }
-    }
-    if (size > largest.length) largest = queue.slice(0, size)
+// Measure actual opaque width perpendicular to the source bone. Every outfit
+// has the same anatomical thickness despite differently shaped cloth cutouts.
+function sourceBone(image, bind) {
+  const a = [bind.a[0] * image.width, bind.a[1] * image.height]
+  const b = [bind.b[0] * image.width, bind.b[1] * image.height]
+  const angle = Math.atan2(b[1] - a[1], b[0] - a[0]), length = Math.hypot(b[0] - a[0], b[1] - a[1])
+  const cv = canvas(image.width, image.height), c = cv.getContext('2d', { willReadFrequently: true }); c.drawImage(image, 0, 0)
+  const data = c.getImageData(0, 0, cv.width, cv.height).data
+  let low = Infinity, high = -Infinity
+  for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) {
+    if (data[(y * cv.width + x) * 4 + 3] < 32) continue
+    const perpendicular = -(x - a[0]) * Math.sin(angle) + (y - a[1]) * Math.cos(angle)
+    low = Math.min(low, perpendicular); high = Math.max(high, perpendicular)
   }
-  const selected = new Uint8Array(count)
-  for (const i of largest) {
-    selected[i] = 1
-    // Include soft ink edges beside the opaque component.
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const x = i % width + dx, y = Math.floor(i / width) + dy
-      if (x >= 0 && x < width && y >= 0 && y < height && source[(y * width + x) * 4 + 3] < 32) selected[y * width + x] = 1
-    }
-  }
-  for (let i = 0; i < count; i++) mask[i * 4 + 3] = selected[i] ? 255 : 0
+  return { a, angle, length, width: bind.width / Math.max(1, high - low) }
 }
 
-export function splitHair(image) {
-  const layer = () => { const cv = document.createElement('canvas'); cv.width = image.width; cv.height = image.height; return cv }
-  const body = layer(), tail = layer(), mask = layer(), m = mask.getContext('2d')
-  tailMask(m, image.width, image.height); m.fill()
-  // Give every source pixel to exactly one layer. Complementary soft masks
-  // would lose opacity when recomposited at the tie's moving boundary.
-  const pixels = m.getImageData(0, 0, mask.width, mask.height)
-  const source = tail.getContext('2d', { willReadFrequently: true }); source.drawImage(image, 0, 0)
-  isolateTail(pixels.data, source.getImageData(0, 0, mask.width, mask.height).data, mask.width, mask.height)
-  m.putImageData(pixels, 0, 0)
-  for (const [cv, operation] of [[body, 'destination-out'], [tail, 'destination-in']]) {
-    const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height); c.drawImage(image, 0, 0); c.globalCompositeOperation = operation; c.drawImage(mask, 0, 0)
-  }
-  return { body, tail }
-}
-
-function drawTorso(ctx, layers, pose, phase) {
-  const { body, tail } = layers, h = TORSO.height, w = body.width / body.height * h
-  const x = -w * TORSO.hip[0], y = -h * TORSO.hip[1], scale = h / body.height
-  ctx.save(); ctx.translate(...pose.hip); ctx.rotate(pose.lean)
-  const tieX = body.width * 0.61
-  for (let sx = 0; sx < tail.width; sx += 8) {
-    const sw = Math.min(8, tail.width - sx), distance = (tieX - (sx + sw / 2)) / tieX
-    ctx.drawImage(tail, sx, 0, sw, tail.height, x + sx * scale, y + hairOffset(phase, distance), sw * scale, h)
-  }
-  ctx.drawImage(body, x, y, w, h); ctx.restore()
-}
-
-// Bind the shoulder to the same source landmark and transform used to paint
-// the torso. A separate world-space guess left the arms floating in front.
-export function shoulderAt(pose, aspect) {
-  const x = (TORSO.shoulder[0] - TORSO.hip[0]) * TORSO.height * aspect
-  const y = (TORSO.shoulder[1] - TORSO.hip[1]) * TORSO.height
-  return [pose.hip[0] + x * Math.cos(pose.lean) - y * Math.sin(pose.lean), pose.hip[1] + x * Math.sin(pose.lean) + y * Math.cos(pose.lean)]
-}
-
-export function armPose(shoulder, angle) {
-  const elbow = [shoulder[0] + Math.sin(angle) * ARM.upper, shoulder[1] + Math.cos(angle) * ARM.upper]
-  // A flexed elbow follows the upper arm. At the back of the pump the hand
-  // passes the waist; at the front it rises toward the chest. Holding both
-  // hands above the elbows pinned the arms into the same cramped silhouette.
-  const fore = 1.65 + angle * 0.85
-  const wrist = [elbow[0] + Math.sin(fore) * ARM.fore, elbow[1] + Math.cos(fore) * ARM.fore]
-  const knuckles = [wrist[0] + Math.sin(fore) * ARM.hand, wrist[1] + Math.cos(fore) * ARM.hand]
-  return { shoulder, elbow, wrist, knuckles }
-}
-
-function bone(ctx, image, id, from, to) {
-  const [a, b] = JOINTS[id].map(p => [p[0] * image.width, p[1] * image.height])
-  const angle = Math.atan2(to[1] - from[1], to[0] - from[0]) - Math.atan2(b[1] - a[1], b[0] - a[0])
-  const scale = Math.hypot(to[0] - from[0], to[1] - from[1]) / Math.hypot(b[0] - a[0], b[1] - a[1])
-  // Compress across the bone, in its own coordinate system. Uniform scaling
-  // turned the baggy cutouts into oversized overlapping knee/ankle lumps.
-  const sourceAngle = Math.atan2(b[1] - a[1], b[0] - a[0])
-  ctx.save(); ctx.translate(...from); ctx.rotate(angle + sourceAngle)
-  if (id === 3) {
-    // The shin owns the kneecap. Hide the thigh kit's second kneepad before
-    // layering the shin, rather than piling two complete pads on one joint.
-    ctx.beginPath(); ctx.rect(-8, -12, Math.hypot(to[0] - from[0], to[1] - from[1]) + 7, 24); ctx.clip()
-  }
-  ctx.scale(scale, scale * (id >= 3 ? 0.72 : 1)); ctx.rotate(-sourceAngle)
-  if (id === 2) {
-    // The cuff/fist has its own scale and wrist pivot; stretching the whole
-    // cutout down the forearm made the hand tiny and bent it off the wrist.
-    const height = image.height * 0.64
-    ctx.drawImage(image, 0, 0, image.width, height, -a[0], -a[1], image.width, height)
-  } else ctx.drawImage(image, -a[0], -a[1])
-  ctx.restore()
-}
-
-function boot(ctx, image, leg) {
-  ctx.save(); ctx.translate(...leg.ankle); ctx.rotate(leg.tilt)
-  ctx.drawImage(image, SHOE.x, SHOE.y, SHOE.w, SHOE.h); ctx.restore()
-}
-
-function drawLeg(ctx, parts, leg) {
-  bone(ctx, parts[3], 3, leg.hip, leg.knee)
-  bone(ctx, parts[4], 4, leg.knee, leg.ankle)
-  boot(ctx, parts[5], leg)
-}
-
-function drawArm(ctx, parts, shoulder, angle) {
-  const { elbow, wrist, knuckles } = armPose(shoulder, angle)
-  bone(ctx, parts[1], 1, shoulder, elbow)
-  bone(ctx, parts[2], 2, elbow, wrist)
-  const image = parts[2], pivot = [0.45 * image.width, 0.69 * image.height]
-  const end = [0.58 * image.width, 0.94 * image.height], top = 0.60 * image.height
-  const rotation = Math.atan2(knuckles[1] - wrist[1], knuckles[0] - wrist[0]) - Math.atan2(end[1] - pivot[1], end[0] - pivot[0])
-  const scale = ARM.hand / Math.hypot(end[0] - pivot[0], end[1] - pivot[1])
-  ctx.save(); ctx.translate(...wrist); ctx.rotate(rotation); ctx.scale(scale, scale)
-  ctx.drawImage(image, 0, top, image.width, image.height - top, -pivot[0], top - pivot[1], image.width, image.height - top)
-  ctx.restore()
-}
-
-export function bakeRunFrames(parts) {
-  const torsoLayers = splitHair(parts[0])
+function painter(parts) {
+  const bones = Object.fromEntries(Object.entries(BIND).map(([id, bind]) => [id, sourceBone(parts[id], bind)]))
   const far = parts.map(image => {
-    const cv = document.createElement('canvas'); cv.width = image.width; cv.height = image.height
-    const ctx = cv.getContext('2d'); ctx.drawImage(image, 0, 0)
-    ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = '#120d2c88'; ctx.fillRect(0, 0, cv.width, cv.height)
+    const cv = canvas(image.width, image.height), c = cv.getContext('2d'); c.drawImage(image, 0, 0)
+    c.globalCompositeOperation = 'source-atop'; c.fillStyle = '#120d2c77'; c.fillRect(0, 0, cv.width, cv.height)
     return cv
   })
-  return Array.from({ length: RUN_FRAMES }, (_, i) => {
-    const cv = document.createElement('canvas'); cv.width = 112; cv.height = 96
-    const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.translate(...RUN_ORIGIN); ctx.imageSmoothingEnabled = false
-    const pose = runPose(i / RUN_FRAMES), torso = parts[0]
-    const shoulder = shoulderAt(pose, torso.width / torso.height)
-    drawArm(ctx, far, shoulder, -pose.arm)
-    drawLeg(ctx, far, pose.far)
-    drawLeg(ctx, parts, pose.near)
-    drawTorso(ctx, torsoLayers, pose, i / RUN_FRAMES)
-    drawArm(ctx, parts, shoulder, pose.arm)
+  const bone = (ctx, images, id, from, to) => {
+    const source = bones[id], angle = Math.atan2(to[1] - from[1], to[0] - from[0])
+    ctx.save(); ctx.translate(...from); ctx.rotate(angle)
+    ctx.scale(Math.hypot(to[0] - from[0], to[1] - from[1]) / source.length, source.width)
+    ctx.rotate(-source.angle); ctx.drawImage(images[id], -source.a[0], -source.a[1]); ctx.restore()
+  }
+  const leg = (ctx, images, l) => {
+    bone(ctx, images, PART.thigh, l.hip, l.knee)
+    bone(ctx, images, PART.shin, l.knee, l.ankle)
+    ctx.save(); ctx.translate(...l.ankle); ctx.rotate(l.tilt)
+    ctx.drawImage(images[PART.shoe], SHOE.x, SHOE.y, SHOE.w, SHOE.h); ctx.restore()
+  }
+  const arm = (ctx, images, a) => {
+    bone(ctx, images, PART.upper, a.shoulder, a.elbow)
+    bone(ctx, images, PART.fore, a.elbow, a.wrist)
+    bone(ctx, images, PART.hand, a.wrist, a.knuckles)
+  }
+  return (pose, phase = 0, running = false) => {
+    const cv = canvas(FRAME.width, FRAME.height), ctx = cv.getContext('2d')
+    ctx.scale(FRAME.scale, FRAME.scale); ctx.translate(...RUN_ORIGIN); ctx.imageSmoothingEnabled = false
+    const shoulder = shoulderAt(pose), nearArm = pose.nearArm || armPose(shoulder, pose.arm), farArm = pose.farArm || armPose(shoulder, -pose.arm)
+    arm(ctx, far, farArm); leg(ctx, far, pose.far); leg(ctx, parts, pose.near)
+    bone(ctx, parts, PART.torso, pose.hip, shoulder)
+    const neck = addPoint(shoulder, rotatePoint([1.8, -1.0], pose.lean)), head = parts[PART.head]
+    const headAngle = pose.headTilt ?? 0.04, headScale = MODEL.head / head.height
+    const tieLocal = [(HEAD_BIND.tie[0] - HEAD_BIND.neck[0]) * head.width * headScale, (HEAD_BIND.tie[1] - HEAD_BIND.neck[1]) * MODEL.head]
+    const tie = addPoint(neck, rotatePoint(tieLocal, headAngle)), hair = parts[PART.hair]
+    // A compact ponytail is its own sprite, attached to a stable head landmark.
+    const hairHeight = MODEL.hair, hairScale = hairHeight / hair.height, hairX = hair.width * HAIR_BIND[0], hairY = hair.height * HAIR_BIND[1]
+    ctx.save(); ctx.translate(...tie); ctx.rotate(headAngle + (running ? 0.35 : 0.04))
+    for (let x = 0; x < hair.width; x += 8) {
+      const sw = Math.min(8, hair.width - x), d = (hairX - (x + sw / 2)) / hairX
+      ctx.drawImage(hair, x, 0, sw, hair.height, (x - hairX) * hairScale, -hairY * hairScale + hairOffset(phase, d), sw * hairScale, hairHeight)
+    }
+    ctx.restore()
+    ctx.save(); ctx.translate(...neck); ctx.rotate(headAngle)
+    ctx.drawImage(head, -HEAD_BIND.neck[0] * head.width * headScale, -HEAD_BIND.neck[1] * MODEL.head, head.width * headScale, MODEL.head); ctx.restore()
+    arm(ctx, parts, nearArm)
     return cv
-  })
+  }
 }
+
+export function bakeRunner(parts) {
+  const paint = painter(parts)
+  const traversal = Array.from({ length: 16 }, (_, i) => paint(traversalPose(i), 0, false))
+  // Rotate a tucked roll about the visible body, not the transparent canvas.
+  const roll = traversal[14], data = roll.getContext('2d').getImageData(0, 0, roll.width, roll.height).data
+  let left = roll.width, right = 0, top = roll.height, bottom = 0
+  for (let y = 0; y < roll.height; y++) for (let x = 0; x < roll.width; x++) {
+    if (data[(y * roll.width + x) * 4 + 3] < 32) continue
+    left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y)
+  }
+  roll.rollPivot = [(left + right) / (2 * FRAME.scale) - RUN_ORIGIN[0], (top + bottom) / (2 * FRAME.scale) - RUN_ORIGIN[1]]
+  roll.poseHeight = (bottom - top) / FRAME.scale
+  return {
+    run: Array.from({ length: RUN_FRAMES }, (_, i) => paint(runPose(i / RUN_FRAMES), i / RUN_FRAMES, true)),
+    traversal,
+  }
+}
+export const bakeRunFrames = parts => bakeRunner(parts).run
+export const bakeTraversalFrames = parts => bakeRunner(parts).traversal

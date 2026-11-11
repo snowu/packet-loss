@@ -1,4 +1,6 @@
 import { PPU } from './sprites.js'
+import { MODEL, SHOE } from './runnerModel.js'
+export { SHOE } from './runnerModel.js'
 
 // A full left/right stride, in world metres. Position, not wall-clock time,
 // advances the feet, so focus, changing speed and skipped draws cannot slip.
@@ -16,7 +18,6 @@ const wrap = x => ((x % 1) + 1) % 1
 
 // Local shoe coordinates, shared with the renderer. Roll around the sole's
 // lowest point so heel strike and toe-off never bury the shoe in the roof.
-export const SHOE = Object.freeze({ x: -2.15, y: -0.9, w: 7.6, h: 4.3 })
 export const soleHeight = tilt => Math.max(SHOE.y * Math.cos(tilt), (SHOE.y + SHOE.h) * Math.cos(tilt)) +
   Math.max(SHOE.x * Math.sin(tilt), (SHOE.x + SHOE.w) * Math.sin(tilt))
 
@@ -77,7 +78,7 @@ export class RunGait {
 
 // Knee bends forward in side view. Both bones retain their length, including
 // during heel recovery; no frame can sprout another leg or reverse a knee.
-export function kneeBetween(hip, ankle, thigh = 9.6, shin = 9.5) {
+export function kneeBetween(hip, ankle, thigh = MODEL.thigh, shin = MODEL.shin) {
   const dx = ankle[0] - hip[0], dy = ankle[1] - hip[1]
   const length = Math.max(0.001, Math.hypot(dx, dy))
   const d = Math.min(length, thigh + shin - 0.001)
@@ -107,7 +108,7 @@ function recoveryFoot(u, knee, ankle, roll) {
 export function runPose(phase) {
   // Compression follows contact; extension and flight follow push-off. The
   // old low, almost stationary pelvis forced a squat through the whole run.
-  const t = wrap(phase), hip = [0, -21.75 + 0.55 * Math.cos((t - 0.11) * TAU * 2)]
+  const t = wrap(phase), hip = [0, -MODEL.hip + MODEL.bounce * Math.cos((t - 0.11) * TAU * 2)]
   const leg = offset => {
     const u = wrap(t + offset), reach = CONTACT_X
     let ankle, tilt

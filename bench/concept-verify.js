@@ -5,6 +5,8 @@ import { chromium } from 'playwright'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { setTimeout as pause } from 'node:timers/promises'
 
+const output = process.argv.find(arg => arg.startsWith('--out='))?.slice('--out='.length) || 'docs/screenshots/concept'
+
 const source = readFileSync(new URL('./bench.js', import.meta.url), 'utf8')
 const pin = source.slice(source.indexOf('function pinWorld()'), source.indexOf('// Runs in the page: counts'))
 const server = await createServer({ logLevel: 'error', server: { port: 0 } }); await server.listen()
@@ -54,10 +56,10 @@ try {
   assert.ok(result.backgrounds <= 5); assert.deepEqual(errors, [])
   const sheet = await page.evaluate(() => {
     const v = window.__game.view, old = v.ctx
-    const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 600
-    const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#0c091b'; ctx.fillRect(0, 0, 600, 300)
+    const cv = document.createElement('canvas'); cv.width = 1440; cv.height = 660
+    const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#0c091b'; ctx.fillRect(0, 0, 720, 330)
     ctx.fillStyle = '#eee8db'; ctx.font = 'bold 13px monospace'; ctx.fillText('PACKET LOSS / PRODUCTION ANIMATION', 15, 22)
-    const states = ['run', 'air', 'slide', 'vault', 'climb', 'zip']
+    const states = ['run', 'idle', 'air', 'slide', 'vault', 'climb', 'zip']
     v.ctx = ctx
     for (const [row, outfit] of ['courier', 'windbreaker', 'techwear'].entries()) {
       v.setRunner(outfit); ctx.fillStyle = '#bfaecf'; ctx.font = '8px monospace'; ctx.fillText(outfit.toUpperCase(), 15, 42 + row * 85)
@@ -69,8 +71,8 @@ try {
     v.ctx = old; v.setRunner('courier')
     return cv.toDataURL('image/png').split(',')[1]
   })
-  mkdirSync('docs/screenshots/concept', { recursive: true })
-  writeFileSync('docs/screenshots/concept/production-sheet.png', Buffer.from(sheet, 'base64'))
+  mkdirSync(output, { recursive: true })
+  writeFileSync(`${output}/production-sheet.png`, Buffer.from(sheet, 'base64'))
   await page.setViewportSize({ width: 390, height: 844 })
   await page.evaluate(() => { for (let i = 0; i < 30; i++) window.__tick() })
   assert.equal(await page.evaluate(() => window.__game.view.canvas.width), 720)

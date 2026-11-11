@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { RunGait, RUN_STRIDE, STANCE, CONTACT_X, RECOVERY_KEYS, SHOE, runFrame, runPose, shinFootAngle } from '../src/pixel/runGait.js'
-import { armPose, shoulderAt, TORSO, ARM, hairOffset } from '../src/pixel/runRig.js'
+import { armPose, shoulderAt, ARM, hairOffset } from '../src/pixel/runRig.js'
+
+import { MODEL, traversalPose } from '../src/pixel/runnerModel.js'
 
 const runner = speed => ({ state: 'run', speed })
 
@@ -56,8 +58,8 @@ describe('distance-driven run gait', () => {
       const phase = i / 1000, pose = runPose(phase)
       for (const [key, offset] of [['near', 0], ['far', 0.5]]) {
         const leg = pose[key]
-        expect(Math.hypot(leg.knee[0] - leg.hip[0], leg.knee[1] - leg.hip[1])).toBeCloseTo(9.6, 8)
-        expect(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1])).toBeCloseTo(9.5, 8)
+        expect(Math.hypot(leg.knee[0] - leg.hip[0], leg.knee[1] - leg.hip[1])).toBeCloseTo(10.7, 8)
+        expect(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1])).toBeCloseTo(10.3, 8)
         const u = (phase + offset) % 1
         const soles = [SHOE.x, SHOE.x + SHOE.w].flatMap(x => [SHOE.y, SHOE.y + SHOE.h].map(y => leg.ankle[1] + x * Math.sin(leg.tilt) + y * Math.cos(leg.tilt)))
         expect(Math.max(...soles)).toBeLessThanOrEqual(1e-8)
@@ -103,16 +105,15 @@ describe('distance-driven run gait', () => {
   })
 
   it('binds shoulders to the leaning torso and keeps elbows flexed through the pump', () => {
-    for (const aspect of [421 / 490, 422 / 490, 426 / 493]) for (let i = 0; i < 64; i++) {
-      const pose = runPose(i / 64), shoulder = shoulderAt(pose, aspect)
+    for (let i = 0; i < 64; i++) {
+      const pose = runPose(i / 64), shoulder = shoulderAt(pose)
       const dx = shoulder[0] - pose.hip[0], dy = shoulder[1] - pose.hip[1]
-      // Inverse transform lands on the painted shoulder, for every outfit.
-      expect((dx * Math.cos(pose.lean) + dy * Math.sin(pose.lean)) / (TORSO.height * aspect) + TORSO.hip[0]).toBeCloseTo(TORSO.shoulder[0], 10)
-      expect((-dx * Math.sin(pose.lean) + dy * Math.cos(pose.lean)) / TORSO.height + TORSO.hip[1]).toBeCloseTo(TORSO.shoulder[1], 10)
+      expect(dx * Math.cos(pose.lean) + dy * Math.sin(pose.lean)).toBeCloseTo(0, 10)
+      expect(-dx * Math.sin(pose.lean) + dy * Math.cos(pose.lean)).toBeCloseTo(-MODEL.torso, 10)
       for (const angle of [pose.arm, -pose.arm]) {
         const { elbow, wrist, knuckles } = armPose(shoulder, angle)
-        expect(Math.hypot(elbow[0] - shoulder[0], elbow[1] - shoulder[1])).toBeCloseTo(5.9, 10)
-        expect(Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1])).toBeCloseTo(4.9, 10)
+        expect(Math.hypot(elbow[0] - shoulder[0], elbow[1] - shoulder[1])).toBeCloseTo(6.0, 10)
+        expect(Math.hypot(wrist[0] - elbow[0], wrist[1] - elbow[1])).toBeCloseTo(5.2, 10)
         expect(Math.hypot(knuckles[0] - wrist[0], knuckles[1] - wrist[1])).toBeCloseTo(ARM.hand, 10)
         // Wrist and fist continue the forearm rather than kinking sideways.
         expect((knuckles[0] - wrist[0]) * (wrist[1] - elbow[1]) - (knuckles[1] - wrist[1]) * (wrist[0] - elbow[0])).toBeCloseTo(0, 10)
@@ -130,11 +131,11 @@ describe('distance-driven run gait', () => {
       expect(hairOffset(i / 64, 0)).toBe(0)
       tips.push(hairOffset(i / 64, 1))
     }
-    expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(1.5)
+    expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(0.7)
     for (const distance of [0, 0.25, 0.5, 0.75, 1]) {
       expect(hairOffset(0, distance)).toBeCloseTo(hairOffset(1, distance), 10)
       expect(Math.abs(hairOffset(1 - 1e-6, distance) - hairOffset(1e-6, distance))).toBeLessThan(0.0001)
-      expect(Math.abs(hairOffset(0.3, distance))).toBeLessThanOrEqual(1.35)
+      expect(Math.abs(hairOffset(0.3, distance))).toBeLessThanOrEqual(0.65)
     }
   })
 
@@ -151,5 +152,28 @@ describe('distance-driven run gait', () => {
     expect(runPose(0.64).near.knee[0]).toBeGreaterThan(7)
     expect(runPose(0.64).arm).toBeLessThan(0)
     expect(runPose(0.14).arm).toBeGreaterThan(0)
+  })
+
+  it('preserves the same limb dimensions and foot registration in all traversal poses', () => {
+    for (let index = 5; index < 16; index++) {
+      const pose = traversalPose(index)
+      expect(pose.headTilt * pose.lean).toBeGreaterThanOrEqual(0)
+      expect(Math.abs(pose.headTilt)).toBeLessThanOrEqual(Math.abs(pose.lean))
+      const bottoms = []
+      for (const leg of [pose.near, pose.far]) {
+        expect(Math.hypot(leg.knee[0] - leg.hip[0], leg.knee[1] - leg.hip[1])).toBeCloseTo(10.7, 10)
+        expect(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1])).toBeCloseTo(10.3, 10)
+        for (const x of [SHOE.x, SHOE.x + SHOE.w]) for (const y of [SHOE.y, SHOE.y + SHOE.h]) bottoms.push(leg.ankle[1] + x * Math.sin(leg.tilt) + y * Math.cos(leg.tilt))
+      }
+      expect(Math.max(...bottoms)).toBeCloseTo(0, 10)
+      for (const arm of [pose.nearArm, pose.farArm]) {
+        expect(Math.hypot(arm.elbow[0] - arm.shoulder[0], arm.elbow[1] - arm.shoulder[1])).toBeCloseTo(6.0, 10)
+        expect(Math.hypot(arm.wrist[0] - arm.elbow[0], arm.wrist[1] - arm.elbow[1])).toBeCloseTo(5.2, 10)
+      }
+    }
+    // Reclining for a pipe slide changes the pose, not the size of the model.
+    const slide = traversalPose(8)
+    expect(shoulderAt(slide)[1]).toBeGreaterThan(-12)
+    expect(slide.nearArm.knuckles[1]).toBeLessThan(1)
   })
 })

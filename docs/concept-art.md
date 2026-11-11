@@ -1,5 +1,9 @@
 # Art-sheet prototype
 
+The runner is now refined by the [v2 model pass](runner-v2.md), with a new
+design sheet, nine separate parts per outfit and consistent anatomy across
+running and traversal. The earlier generated atlases below document v1.
+
 The default game now draws production artwork based on the approved art sheet.
 This replaces the earlier incremental procedural pass. It runs the existing
 Heist, Endless and Time Trial simulation, including the merged route/contract
@@ -14,9 +18,9 @@ changes from master.
 - The canvas has twice the previous raster resolution in each axis. World
   coordinates and physics stay in the same units; image assets draw into this
   higher-resolution surface with nearest-neighbour sampling.
-- Courier, Windbreaker and Techwear each have a transparent traversal atlas
-  and a six-part running rig. Running is baked from articulated limbs into
-  64 registered frames per outfit; the traversal frames cover airborne movement,
+- Courier, Windbreaker and Techwear each have a transparent nine-part rig.
+  Running is baked from articulated limbs into 64 registered frames per outfit;
+  sixteen traversal poses use the same anatomical dimensions and cover airborne movement,
   sliding, vaulting, hanging, climbing, wall-running, ziplines, rolls and idle.
   Ghosts use the same production artwork with a cyan treatment.
 - Running phase follows distance travelled. Both feet alternate, planted feet

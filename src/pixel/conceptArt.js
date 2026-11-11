@@ -53,11 +53,9 @@ export async function loadConceptArt() {
     const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error(`Cannot load ${name}`)); im.src = base + name
   })
   try {
-    const [courier, environment, skyline, windbreaker, techwear, courierRig, windbreakerRig, techwearRig] = await Promise.all(['courier-atlas.png', 'environment-atlas.png', 'skyline.png', 'windbreaker-atlas.png', 'techwear-atlas.png', 'courier-rig.png', 'windbreaker-rig.png', 'techwear-rig.png'].map(image))
-    art = { courier: frames(courier), kit: frames(environment), skyline }
-    art.outfits = { courier: art.courier, windbreaker: frames(windbreaker), techwear: frames(techwear) }
-    art.rigs = { courier: frames(courierRig, 3, 2), windbreaker: frames(windbreakerRig, 3, 2), techwear: frames(techwearRig, 3, 2) }
-    art.runnerScale = 37 / Math.max(...art.courier.slice(0, 6).map(c => c.height), art.courier[15].height)
+    const [environment, skyline, courierRig, windbreakerRig, techwearRig] = await Promise.all(['environment-atlas.png', 'skyline.png', 'v2/courier-rig.png', 'v2/windbreaker-rig.png', 'v2/techwear-rig.png'].map(image))
+    art = { kit: frames(environment), skyline }
+    art.rigs = { courier: frames(courierRig, 3, 3), windbreaker: frames(windbreakerRig, 3, 3), techwear: frames(techwearRig, 3, 3) }
     // District colour work happens before gameplay, not on a scrolling frame.
     art.backgrounds = new Map()
     const tints = { 'Kowloon Night': null, 'Acid Rain': '#397251', 'Smog Noon': '#b49351', 'Neon Dusk': '#a1436a', 'Blackout': '#50304a' }
