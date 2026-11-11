@@ -356,13 +356,13 @@ function startVault(p, s, events, trip = false) {
     startKinematic(p, 'vault', {
       ex, ey: p.y, peak: s.y1 + 0.12,
       T: Math.max(0.2, (ex - p.x) / speed) * slow,
-      mode: 'arc', end: 'air', top: s.y1,
+      mode: 'arc', end: 'air', top: s.y1, x0: s.x0, x1: s.x1,
     })
   } else {
     startKinematic(p, 'vault', {
       ex: s.x0 + hw + 0.4 + speed * 0.1, ey: s.y1,
       T: PHYS.VAULT_STEP_TIME * (clamber ? 1.6 : 1) * (trip ? 1.6 : 1),
-      mode: 'step', end: 'run', top: s.y1,
+      mode: 'step', end: 'run', top: s.y1, x0: s.x0, x1: s.x1,
     })
   }
   if (trip) {

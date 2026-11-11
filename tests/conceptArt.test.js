@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { atlasCell, poseFor, KIT } from '../src/pixel/conceptArt.js'
+import { atlasCell, trimSlivers, KIT } from '../src/pixel/conceptArt.js'
 import { decodePng } from '../scripts/png.mjs'
 import { serviceWorker } from '../vite.config.js'
+import { SKINS } from '../src/pixel/rig/skins.js'
 
 describe('production concept art', () => {
   it('covers every atlas pixel exactly once even when dimensions do not divide by four', () => {
@@ -31,37 +32,22 @@ describe('production concept art', () => {
     expect(Object.keys(KIT)).toHaveLength(16)
   })
 
-  it('gives traversal states deliberate poses and loops the run animation', () => {
-    const states = { slide: 8, vault: 9, mantle: 9, climb: 11, wallslide: 10, wallrun: 12, zip: 13, roll: 14, dead: 14, blocked: 15 }
-    for (const [state, frame] of Object.entries(states)) expect(poseFor({ state, speed: 12 }, 2)).toBe(frame)
-    expect(poseFor({ state: 'air', vy: 4 }, 0)).toBe(6)
-    expect(poseFor({ state: 'air', vy: -4 }, 0)).toBe(5)
-    expect(poseFor({ state: 'run', speed: 12 }, 0, true)).toBe(15)
-    const seen = new Set(Array.from({ length: 60 }, (_, i) => poseFor({ state: 'run', speed: 12 }, i / 30)))
-    expect([...seen].sort()).toEqual([0, 1, 2, 3, 4, 5])
-    // Recorded trial ghosts omit live-player speed.
-    expect(poseFor({ state: 'run' }, 1)).toBeGreaterThanOrEqual(0)
-    expect(poseFor({ state: 'run' }, 1)).toBeLessThan(6)
-    expect(poseFor({ state: 'run', speed: NaN }, NaN)).toBe(0)
+  it('trims a neighbouring sprite\'s bleed from a cell, and nothing else', () => {
+    const used = (...runs) => { const u = new Uint32Array(100); for (const [a, b] of runs) u.fill(1, a, b + 1); return u }
+    expect(trimSlivers(used([0, 1], [30, 90]))).toEqual([30, 90])   // bleed at the top edge
+    expect(trimSlivers(used([10, 70], [98, 99]))).toEqual([10, 70]) // and at the bottom
+    expect(trimSlivers(used([3, 4], [30, 90]))).toEqual([3, 90])    // detail away from the edge stays
+    expect(trimSlivers(used([0, 20], [30, 90]))).toEqual([0, 90])   // a real part stays
+    expect(trimSlivers(used([0, 1], [3, 90]))).toEqual([0, 90])     // no clear gap: one sprite
+    // The crate fills its cell's box, so it is drawn as tall as it collides.
+    const { w, h, rgba } = decodePng(readFileSync(new URL('../public/concept-art/environment-atlas.png', import.meta.url)))
+    const c = atlasCell(w, h, KIT.crate), rows = new Uint32Array(c.h)
+    for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (rgba[((c.y + y) * w + c.x + x) * 4 + 3] >= 32) rows[y]++
+    expect(trimSlivers(rows)[0]).toBeGreaterThan(50)
   })
 
   it('precaches all production artwork for offline play', () => {
     const sw = serviceWorker('test', [])
-    for (const name of ['courier-atlas.png', 'windbreaker-atlas.png', 'techwear-atlas.png', 'environment-atlas.png', 'skyline.png', 'courier-rig.png', 'windbreaker-rig.png', 'techwear-rig.png']) expect(sw).toContain(`concept-art/${name}`)
-  })
-
-  it('ships six complete transparent rig parts for each outfit', () => {
-    for (const name of ['courier', 'windbreaker', 'techwear']) {
-      const { w, h, rgba } = decodePng(readFileSync(new URL(`../public/concept-art/${name}-rig.png`, import.meta.url)))
-      for (let i = 0; i < 6; i++) {
-        const cell = atlasCell(w, h, i, 3, 2)
-        let opaque = 0, clear = 0
-        for (let y = cell.y; y < cell.y + cell.h; y++) for (let x = cell.x; x < cell.x + cell.w; x++) {
-          if (rgba[(y * w + x) * 4 + 3] > 32) opaque++; else clear++
-        }
-        expect(opaque, `${name} part ${i}`).toBeGreaterThan(500)
-        expect(clear, `${name} part ${i} gutters`).toBeGreaterThan(500)
-      }
-    }
+    for (const name of ['environment-atlas.png', 'skyline.png', ...Object.values(SKINS).map(skin => skin.sheet)]) expect(sw).toContain(`concept-art/${name}`)
   })
 })

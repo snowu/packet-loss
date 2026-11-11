@@ -9,7 +9,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 1.45,
     "offscreen.globalCompositeOperation=": 1.25,
-    "offscreen.drawImage": 0.42,
+    "offscreen.drawImage": 19.29,
     "offscreen.fillStyle=": 0.46,
     "offscreen.fillRect": 0.46,
     "offscreen.createLinearGradient": 0.04,
@@ -25,7 +25,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.97,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 0.4,
+    "offscreen.drawImage": 19.15,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
     "cachedSprites": 118
@@ -40,7 +40,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.97,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 0.4,
+    "offscreen.drawImage": 19.15,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
     "cachedSprites": 121
@@ -55,7 +55,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.92,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 0.4,
+    "offscreen.drawImage": 19.2,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
     "cachedSprites": 132
@@ -70,7 +70,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.9,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 0.4,
+    "offscreen.drawImage": 19.16,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
     "cachedSprites": 103
@@ -85,7 +85,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 1.17,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 0.4,
+    "offscreen.drawImage": 19.06,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
     "gpu.texSubImage2D": 1,
@@ -102,7 +102,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 1.25,
     "offscreen.globalCompositeOperation=": 1.18,
-    "offscreen.drawImage": 0.39,
+    "offscreen.drawImage": 19.2,
     "offscreen.fillStyle=": 0.39,
     "offscreen.fillRect": 0.39,
     "cachedSprites": 125

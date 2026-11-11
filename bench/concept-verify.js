@@ -1,9 +1,10 @@
-// Exercises the production atlases, real game modes and cache lifecycle.
+// Exercises every runner state and outfit, real game modes and cache lifecycle.
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import { chromium } from 'playwright'
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { setTimeout as pause } from 'node:timers/promises'
+
 
 const source = readFileSync(new URL('./bench.js', import.meta.url), 'utf8')
 const pin = source.slice(source.indexOf('function pinWorld()'), source.indexOf('// Runs in the page: counts'))
@@ -35,6 +36,11 @@ try {
       let n = 0
       for (let i = 0; i < pixels.length; i += 4) if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 20) n++
       if (n < 30) throw new Error(`Missing production pose: ${state}`)
+      // The painted sprite must fit its frame: nothing opaque on the border.
+      const im = v.rig.image(), edge = im.getContext('2d').getImageData(0, 0, im.width, im.height).data
+      for (let y = 0; y < im.height; y++) for (let x = 0; x < im.width; x += (y && y < im.height - 1 ? im.width - 1 : 1)) {
+        if (edge[(y * im.width + x) * 4 + 3]) throw new Error(`${outfit} ${state} clips the sprite edge at ${x},${y}`)
+      }
       poses.add(`${outfit}:${state}`)
       }
     }
@@ -52,25 +58,6 @@ try {
   assert.equal(result.poses, 39); assert.ok(result.doubled)
   for (const run of result.runs) { assert.ok(run.distance > 70); assert.ok(run.materials < 12); assert.ok(run.kit <= 96) }
   assert.ok(result.backgrounds <= 5); assert.deepEqual(errors, [])
-  const sheet = await page.evaluate(() => {
-    const v = window.__game.view, old = v.ctx
-    const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 600
-    const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#0c091b'; ctx.fillRect(0, 0, 600, 300)
-    ctx.fillStyle = '#eee8db'; ctx.font = 'bold 13px monospace'; ctx.fillText('PACKET LOSS / PRODUCTION ANIMATION', 15, 22)
-    const states = ['run', 'air', 'slide', 'vault', 'climb', 'zip']
-    v.ctx = ctx
-    for (const [row, outfit] of ['courier', 'windbreaker', 'techwear'].entries()) {
-      v.setRunner(outfit); ctx.fillStyle = '#bfaecf'; ctx.font = '8px monospace'; ctx.fillText(outfit.toUpperCase(), 15, 42 + row * 85)
-      for (let i = 0; i < states.length; i++) {
-        v.drawActor({ state: states[i], speed: 12, vy: -2, t: 0.2 }, 62 + i * 93, 94 + row * 85, 0.5)
-        ctx.fillStyle = '#bfaecf'; ctx.font = '7px monospace'; ctx.fillText(states[i].toUpperCase(), 49 + i * 93, 107 + row * 85)
-      }
-    }
-    v.ctx = old; v.setRunner('courier')
-    return cv.toDataURL('image/png').split(',')[1]
-  })
-  mkdirSync('docs/screenshots/concept', { recursive: true })
-  writeFileSync('docs/screenshots/concept/production-sheet.png', Buffer.from(sheet, 'base64'))
   await page.setViewportSize({ width: 390, height: 844 })
   await page.evaluate(() => { for (let i = 0; i < 30; i++) window.__tick() })
   assert.equal(await page.evaluate(() => window.__game.view.canvas.width), 720)

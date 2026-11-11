@@ -1,11 +1,12 @@
 import { PixelView } from './view.js'
-import { conceptArt, KIT, poseFor } from './conceptArt.js'
+import { conceptArt, KIT } from './conceptArt.js'
 import { paletteAt } from './palette.js'
 import { css, hash, mix } from './pixels.js'
 import { PPU } from './sprites.js'
 import { FocusFilter } from './focus.js'
-import { RunGait, RUN_STRIDE, STANCE, runFrame } from './runGait.js'
-import { bakeRunFrames, RUN_ORIGIN } from './runRig.js'
+import { RunGait, RUN_STRIDE, STANCE } from './runGait.js'
+import { RunnerRig, RUN_ORIGIN } from './rig/index.js'
+import { FRAME } from './runnerModel.js'
 
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -18,7 +19,10 @@ export class ConceptView extends PixelView {
     this.art = conceptArt()
     this.gait = new RunGait()
     this.ghostGait = new RunGait()
-    this.runFrames = Object.fromEntries(Object.entries(this.art.rigs).map(([name, parts]) => [name, bakeRunFrames(parts)]))
+    // One rig each for the player and the ghost. The skeleton and its
+    // animation are shared by every outfit; the outfit is only its painted parts.
+    this.rig = new RunnerRig(this.runnerId)
+    this.ghostRig = new RunnerRig(this.runnerId)
     this.backgrounds = new Map()
     this.materials = new Map()
     this.kitCache = new Map()
@@ -31,14 +35,6 @@ export class ConceptView extends PixelView {
     const roof = this.art.kit[KIT.roof], sy = Math.floor(roof.height * 0.64)
     const roofCtx = this.roofTile.getContext('2d'); roofCtx.imageSmoothingEnabled = false
     roofCtx.drawImage(roof, 0, sy, roof.width, roof.height - sy, 0, 0, 190, 26)
-    this.preparedActors = Object.fromEntries(Object.entries(this.art.outfits).map(([name, frames]) => [name, frames.map(im => {
-      const cv = document.createElement('canvas')
-      const scale = 37 / Math.max(...frames.slice(0, 6).map(c => c.height), frames[15].height)
-      cv.width = Math.max(1, Math.round(im.width * scale * 2))
-      cv.height = Math.max(1, Math.round(im.height * scale * 2))
-      const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(im, 0, 0, cv.width, cv.height)
-      return cv
-    })]))
     document.body.classList.add('concept-art')
   }
 
@@ -54,8 +50,13 @@ export class ConceptView extends PixelView {
 
   snap(x, y) { super.snap(x, y); this.cam.x = x + this.W * 0.18 / PPU; this.cam.y = y + 3.8 }
   crossfade() { this.stale = true }
+  setRunner(id) {
+    super.setRunner(id)
+    this.rig?.setSkin(id); this.ghostRig?.setSkin(id)
+  }
+
   bind(level) {
-    this.gait?.reset(); this.ghostGait?.reset()
+    this.gait?.reset(); this.ghostGait?.reset(); this.rig?.reset(); this.ghostRig?.reset()
     if (this.materials) { for (const cv of this.materials.values()) cv.width = cv.height = 0; this.materials.clear() }
     super.bind(level)
   }
@@ -278,23 +279,15 @@ export class ConceptView extends PixelView {
   }
 
   drawActor(p, x, y, time, idle = false, ghost = false, phase = (p.x ?? time * 12) / RUN_STRIDE) {
-    if (p.state === 'run' && !idle) {
-      const im = this.runFrames[this.runnerId][runFrame(phase)], ctx = this.ctx
-      ctx.save()
-      if (ghost) { ctx.globalAlpha *= 0.5; ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)' }
-      ctx.drawImage(im, x - RUN_ORIGIN[0], y - RUN_ORIGIN[1], im.width / 2, im.height / 2)
-      ctx.restore()
-      return
-    }
-    const index = poseFor(p, time, idle), im = (this.preparedActors[this.runnerId] || this.preparedActors.courier)[index], ctx = this.ctx
-    const w = im.width / 2, h = im.height / 2
+    const rig = ghost ? this.ghostRig : this.rig, ctx = this.ctx
+    rig.update(p, time, phase, idle, p.x ?? 0, p.y ?? 0)
+    const im = rig.image()
     ctx.save()
-    if (ghost) ctx.globalAlpha *= 0.5
-    if (ghost) ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)'
-    if (p.state === 'roll') {
-      ctx.translate(x, y - h / 2); ctx.rotate((p.t ?? time) * 12)
-      ctx.drawImage(im, -w / 2, -h / 2, w, h)
-    } else ctx.drawImage(im, Math.round(x - w * (index === 8 ? 0.38 : 0.54)), Math.round(y - h), Math.round(w), Math.round(h))
+    if (ghost) { ctx.globalAlpha *= 0.5; ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)' }
+    // The sprite is drawn at twice the screen's resolution and averaged down
+    // onto whole device pixels, so its edges are clean and it does not shimmer.
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(im, Math.round((x - RUN_ORIGIN[0]) * 2) / 2, Math.round((y - RUN_ORIGIN[1]) * 2) / 2, FRAME.width / FRAME.scale, FRAME.height / FRAME.scale)
     ctx.restore()
   }
 

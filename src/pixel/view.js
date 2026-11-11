@@ -1303,6 +1303,10 @@ export class PixelView {
       ctx.fillStyle = css(mix(pal.shadow, [20, 20, 30], 0.5))
       ctx.fillRect(this.sx(s.rx) - 1, this.sy(s.ry + PHYS.ZIP_HANG) - 1, 4, 3)
     }
+    if (s.p.state === 'slide' && Math.random() < 0.8) {
+      // grit kicked up behind a slide
+      this.particles.push({ x: s.rx - 0.5 + Math.random() * 0.9, y: s.ry + 0.05, vx: -1.5 - Math.random() * 3, vy: 0.4 + Math.random() * 1.6, life: 0.3, max: 0.3, size: 1 })
+    }
     if (s.p.state === 'wallrun' && Math.random() < 0.6) {
       this.particles.push({ x: s.rx - 0.2, y: s.ry + 0.1, vx: -2 - Math.random() * 2, vy: Math.random() * 1.5, life: 0.25, max: 0.25, color: [255, 200, 90], size: 1 })
     }
