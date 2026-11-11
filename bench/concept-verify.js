@@ -36,6 +36,11 @@ try {
       let n = 0
       for (let i = 0; i < pixels.length; i += 4) if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 20) n++
       if (n < 30) throw new Error(`Missing production pose: ${state}`)
+      // The painted sprite must fit its frame: nothing opaque on the border.
+      const im = v.rig.image(), edge = im.getContext('2d').getImageData(0, 0, im.width, im.height).data
+      for (let y = 0; y < im.height; y++) for (let x = 0; x < im.width; x += (y && y < im.height - 1 ? im.width - 1 : 1)) {
+        if (edge[(y * im.width + x) * 4 + 3]) throw new Error(`${outfit} ${state} clips the sprite edge at ${x},${y}`)
+      }
       poses.add(`${outfit}:${state}`)
       }
     }

@@ -1,7 +1,7 @@
 # Art-sheet prototype
 
 The runner is now drawn by the [runner rig](runner-rig.md): one skeleton,
-posed live with blended animation, with each outfit a palette on it. The
+posed live with blended animation and dressed in each outfit's painted parts. The
 generated atlases below document the earlier painted versions.
 
 The default game now draws production artwork based on the approved art sheet.
@@ -18,7 +18,7 @@ changes from master.
 - The canvas has twice the previous raster resolution in each axis. World
   coordinates and physics stay in the same units; image assets draw into this
   higher-resolution surface with nearest-neighbour sampling.
-- Courier, Windbreaker and Techwear are palettes on one rigged skeleton
+- Courier, Windbreaker and Techwear are painted part sheets on one rigged skeleton
   ([runner rig](runner-rig.md)). Every move is posed live and crossfaded:
   running, airborne movement, sliding, vaulting, mantling, hanging, climbing,
   wall-running, ziplines, rolls, stumbles and idle. Ghosts use the same rig

@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { BONES, solve, soleBottom, bottomOf, CHANNELS } from '../src/pixel/rig/skeleton.js'
 import { runChannels, sampleState, CLIPS } from '../src/pixel/rig/clips.js'
 import { Animator } from '../src/pixel/rig/animator.js'
-import { SKINS, defineSkin, MATERIALS } from '../src/pixel/rig/skins.js'
-import { drawRunner, newRaster, colorize, paletteFor } from '../src/pixel/rig/paint.js'
+import { SKINS, defineSkin, rulesFor, recolorPixels } from '../src/pixel/rig/skins.js'
+import { atlasCell } from '../src/pixel/conceptArt.js'
+import { decodePng } from '../scripts/png.mjs'
+import { readFileSync } from 'node:fs'
 import { STANCE, RUN_STRIDE, CONTACT_X } from '../src/pixel/runGait.js'
-import { SHOE, FRAME } from '../src/pixel/runnerModel.js'
+import { SHOE, PART } from '../src/pixel/runnerModel.js'
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
@@ -148,40 +150,40 @@ describe('runner animation', () => {
 })
 
 describe('runner skins', () => {
-  const opaque = px => Array.from(px, c => c >>> 24 ? 1 : 0).join('')
-
-  it('are recolours: every skin covers exactly the same pixels in every pose', () => {
-    const skins = Object.values(SKINS)
-    for (const s of STATES) {
-      const a = settle(s)
-      const masks = skins.map(skin => opaque(colorize(drawRunner(newRaster(), a.joints, a.hairPoints, skin), paletteFor(skin))))
-      for (const m of masks) expect(m, s.name).toBe(masks[0])
-    }
-  })
-
-  it('fits every pose inside the sprite without clipping an edge', () => {
-    const W = FRAME.width, H = FRAME.height
-    for (const s of STATES) {
-      const a = settle(s)
-      const px = colorize(drawRunner(newRaster(), a.joints, a.hairPoints, SKINS.courier), paletteFor(SKINS.courier))
-      let count = 0
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        if (!(px[y * W + x] >>> 24)) continue
-        count++
-        expect(x > 0 && y > 0 && x < W - 1 && y < H - 1, `${s.name} touches the sprite edge at ${x},${y}`).toBe(true)
+  it('binds every outfit sheet to the same nine parts', () => {
+    for (const skin of Object.values(SKINS)) {
+      const { w, h, rgba } = decodePng(readFileSync(new URL(`../public/concept-art/${skin.sheet}`, import.meta.url)))
+      for (let i = 0; i < 9; i++) {
+        const c = atlasCell(w, h, i, 3, 3)
+        let opaque = 0
+        for (let y = c.y; y < c.y + c.h; y++) for (let x = c.x; x < c.x + c.w; x++) if (rgba[(y * w + x) * 4 + 3] > 32) opaque++
+        expect(opaque, `${skin.sheet} part ${i}`).toBeGreaterThan(500)
       }
-      expect(count, s.name).toBeGreaterThan(500)
     }
+    expect(Object.keys(PART)).toHaveLength(9)
   })
 
-  it('can be added with nothing but colours, and rejects an incomplete palette', () => {
-    const ghost = defineSkin({ name: 'Test', colors: { skin: '#a07050', hair: '#101010', top: '#204060', trim: '#ffcc00', pants: '#202020', shoe: '#ffffff', sole: '#333333', belt: '#000000' } })
-    const a = settle(STATES[1])
-    const base = colorize(drawRunner(newRaster(), a.joints, a.hairPoints, SKINS.courier), paletteFor(SKINS.courier))
-    const mine = colorize(drawRunner(newRaster(), a.joints, a.hairPoints, ghost), paletteFor(ghost))
-    expect(opaque(mine)).toBe(opaque(base))
-    expect(Array.from(mine).some((c, i) => c !== base[i])).toBe(true)
-    expect(() => defineSkin({ name: 'Broken', colors: { skin: '#fff' } })).toThrow(/missing/)
-    expect(MATERIALS[0]).toBe('outline')
+  it('recolours a part without touching its silhouette or unmatched hues', () => {
+    // red glove, skin-tone fingers, grey strap, transparent
+    const px = new Uint8ClampedArray([200, 30, 40, 255, 230, 170, 130, 255, 120, 120, 120, 255, 200, 30, 40, 0])
+    const before = Array.from(px)
+    recolorPixels(px, { where: [330, 15], tint: '#2b7fff' })
+    expect(px[2]).toBeGreaterThan(px[0])                      // the glove is blue now
+    expect(Array.from(px.slice(4, 12))).toEqual(before.slice(4, 12)) // skin and grey untouched
+    expect(Array.from(px.slice(12))).toEqual(before.slice(12))       // transparent pixels untouched
+    for (let i = 3; i < px.length; i += 4) expect(px[i]).toBe(before[i])
+    const all = new Uint8ClampedArray([200, 30, 40, 255])
+    recolorPixels(all, [{ hue: 120 }, { light: 0.5 }])
+    expect(all[1]).toBeGreaterThan(all[0])
+    expect(all[1]).toBeLessThan(120)
+  })
+
+  it('defines a skin as a sheet plus optional per-part recolours', () => {
+    const night = defineSkin({ name: 'Night', sheet: SKINS.courier.sheet, recolor: { all: { light: 0.9 }, torso: { hue: 200 }, shoe: [{ where: [330, 15], tint: '#35e0ff' }] } })
+    expect(rulesFor(night, 'torso')).toEqual([{ light: 0.9 }, { hue: 200 }])
+    expect(rulesFor(night, 'head')).toEqual([{ light: 0.9 }])
+    expect(rulesFor(SKINS.courier, 'torso')).toEqual([])
+    expect(() => defineSkin({ name: 'Broken' })).toThrow(/sheet/)
+    expect(() => defineSkin({ name: 'Broken', sheet: 'x.png', recolor: { cape: { hue: 1 } } })).toThrow(/unknown part/)
   })
 })

@@ -15,7 +15,8 @@ const release = { id, version, builtAt }
 // The offline service worker: src/sw.js with the release and the files to
 // precache filled in. The art lab only runs locally, so it stays out.
 const PUBLIC = ['./', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
-  'concept-art/environment-atlas.png', 'concept-art/skyline.png']
+  'concept-art/environment-atlas.png', 'concept-art/skyline.png',
+  'concept-art/v2/courier-rig.png', 'concept-art/v2/windbreaker-rig.png', 'concept-art/v2/techwear-rig.png']
 // the sprite PNGs (see src/pixel/artPng.js), so they work offline too
 export function artFiles(dir = new URL('./public/art/', import.meta.url)) {
   try {

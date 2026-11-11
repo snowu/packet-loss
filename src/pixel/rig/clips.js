@@ -103,7 +103,7 @@ export const CLIPS = {
   // A tight ball. The animator spins it once per roll.
   roll: clip([
     [0, { lean: 1.25, chest: 0.45, head: 1.6, nThigh: 2.2, nKnee: 2.5, nFoot: 0.9, fThigh: 1.95, fKnee: 2.45, fFoot: 1.0, nArm: 1.25, nElbow: 1.9, fArm: 1.0, fElbow: 2.1 }],
-  ], { register: 'ball' }),
+  ], { register: 'none' }),
 
   // A trip: pitch forward, arms out, catch it, run again.
   stumble: clip([
@@ -188,10 +188,11 @@ export function sampleState(name, p, ctx, out = {}) {
     case 'stumble': return registered('stumble', t / PHYS.STUMBLE_TIME, out)
     case 'dead': return registered('dead', t / 0.35, out)
     case 'roll': {
-      registered('roll', 0, out)
+      sample(CLIPS.roll, 0, out)
       // Exactly one turn per roll, quick in the middle, eased at both ends.
+      // The ball stays on the roof whichever way up it is.
       out.spin = TAU * ease(t / PHYS.ROLL_TIME)
-      return out
+      return Object.assign(out, ground(out))
     }
   }
   return runChannels(ctx.phase, pace(p), out)
@@ -207,9 +208,6 @@ function registered(name, t, out) {
   else if (c.register === 'hands') {
     const j = solve(out), grip = Math.min(j.nearArm.knuckles[1], j.farArm.knuckles[1])
     out.y += ZIP_GRIP - grip
-  } else if (c.register === 'ball') {
-    // The pivot sits one body-radius above the roof whatever the rotation.
-    out.y = -11 + 4
   }
   return out
 }

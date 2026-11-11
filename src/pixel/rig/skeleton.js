@@ -86,8 +86,13 @@ function chain(p) {
   }
 }
 
-// The point a roll turns about: the middle of the tucked body.
-export const spinPivot = p => [p.x + 1.5, p.y - 4]
+// The point a roll turns about: the middle of the body as posed, so a
+// tucked ball turns about its own centre rather than swinging around a hip.
+export function spinPivot(j) {
+  const pts = [j.hip, j.shoulder, at(j.head, 0, 5), j.near.knee, j.near.ankle, j.far.knee, j.far.ankle]
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1])
+  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+}
 
 const rot = (pt, c, a) => {
   const s = Math.sin(a), k = Math.cos(a), dx = pt[0] - c[0], dy = pt[1] - c[1]
@@ -108,7 +113,8 @@ function spun(j, c, a) {
 }
 
 export function solve(p) {
-  return spun(chain(p), spinPivot(p), p.spin)
+  const j = chain(p)
+  return p.spin ? spun(j, spinPivot(j), p.spin) : j
 }
 
 // Shoe outline in foot space (ankle at the origin), shared with the gait's

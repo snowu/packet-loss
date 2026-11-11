@@ -15,8 +15,8 @@ const BLEND = { run: 0.1, idle: 0.3, brace: 0.12, air: 0.1, slide: 0.08, vault: 
 const GROUNDED = new Set(['run', 'idle', 'brace'])
 
 // Hair: segment lengths (model units) from the tie to the tip.
-export const HAIR_SEGMENTS = Object.freeze([1.9, 1.8, 1.7, 1.55, 1.35])
-export const HAIR_TIE = Object.freeze([-2.7, 5.5]) // head frame: back, up
+export const HAIR_SEGMENTS = Object.freeze([1.6, 1.5, 1.4, 1.25, 1.05])
+export const HAIR_TIE = Object.freeze([-1.6, 4.2]) // head frame: back, up
 
 export class Hair {
   constructor() { this.reset() }
@@ -60,7 +60,8 @@ export class Hair {
     const pts = [anchor]
     for (let i = 0; i < HAIR_SEGMENTS.length; i++) {
       const a = this.angle ? this.angle[i] : 1.2, p = pts[i]
-      pts.push([p[0] - Math.cos(a) * HAIR_SEGMENTS[i], p[1] + Math.sin(a) * HAIR_SEGMENTS[i]])
+      // The ponytail lies on the roof rather than passing through it.
+      pts.push([p[0] - Math.cos(a) * HAIR_SEGMENTS[i], Math.min(p[1] + Math.sin(a) * HAIR_SEGMENTS[i], Math.max(p[1], -0.8))])
     }
     return pts
   }

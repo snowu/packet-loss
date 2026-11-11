@@ -22,7 +22,7 @@ a fixed loop.
 
 ## Review
 
-![Run cycle, all skins](screenshots/runner-rig/run-cycle.png)
+![Run cycle, all outfits](screenshots/runner-rig/run-cycle.png)
 
 ```sh
 node bench/gait-review.js --out=docs/screenshots/runner-rig --record

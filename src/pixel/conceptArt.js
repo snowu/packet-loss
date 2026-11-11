@@ -1,5 +1,7 @@
 // Production atlases generated from the approved art sheet. Geometry is still
 // owned by the simulation; these images only supply its visible materials.
+import { SKINS } from './rig/skins.js'
+
 export const KIT = Object.freeze({ tank: 0, ac: 1, vent: 2, sign: 3, drone: 4, crate: 5, pipe: 6, spring: 7, duct: 8, shard: 9, wallrun: 10, cables: 11, roof: 12, concrete: 13, industrial: 14, stripes: 15 })
 export const ATLAS_GRID = 4
 let art = null
@@ -35,8 +37,11 @@ export async function loadConceptArt() {
     const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error(`Cannot load ${name}`)); im.src = base + name
   })
   try {
-    const [environment, skyline] = await Promise.all(['environment-atlas.png', 'skyline.png'].map(image))
+    const sheets = [...new Set(Object.values(SKINS).map(skin => skin.sheet))]
+    const [environment, skyline, ...rigs] = await Promise.all(['environment-atlas.png', 'skyline.png', ...sheets].map(image))
     art = { kit: frames(environment), skyline }
+    // Each outfit sheet is nine trimmed parts; rig/parts.js binds them to the skeleton.
+    art.rigs = Object.fromEntries(sheets.map((sheet, i) => [sheet, frames(rigs[i], 3, 3)]))
     // District colour work happens before gameplay, not on a scrolling frame.
     art.backgrounds = new Map()
     const tints = { 'Kowloon Night': null, 'Acid Rain': '#397251', 'Smog Noon': '#b49351', 'Neon Dusk': '#a1436a', 'Blackout': '#50304a' }

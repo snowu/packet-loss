@@ -1,82 +1,69 @@
-// Runner skins. A skin is colours plus a few switches that decide which
-// material a body region uses (bare arm or sleeve, glove or hand, collar or
-// neck). It never changes geometry: every skin draws the exact same pixels
-// in every frame, only in different colours. Add a skin by adding an entry.
-import { OUTLINE_MAT, FAR } from './raster.js'
+// Runner skins. A skin is a sheet of nine painted parts (3x3, reading order:
+// head, torso, ponytail; upper arm, forearm, fist; thigh, shin, shoe), and
+// optionally a recolour of it. Every sheet is bound to the same skeleton at
+// the same landmarks and drawn at the same girth (see parts.js), so a skin
+// changes the surface and never the rigging, proportions or animation.
+import { PART } from '../runnerModel.js'
 
-export const MATERIALS = Object.freeze(['outline', 'skin', 'hair', 'top', 'trim', 'pants', 'pad', 'shoe', 'sole', 'glove', 'belt', 'eye', 'band', 'sleeve', 'collar'])
-export const MAT = Object.freeze(Object.fromEntries(MATERIALS.map((m, i) => [m, i + 1])))
-if (MAT.outline !== OUTLINE_MAT) throw new Error('outline must be material 1')
-
-export const STYLE_DEFAULTS = Object.freeze({
-  sleeves: 'none', // 'none' | 'short' | 'long'
-  midriff: false,  // bare waist between top and belt
-  gloves: true,    // fingerless gloves over the fists
-  collar: false,   // scarf / high collar over the neck
-  zip: false,      // jacket zip and seams in the trim colour
-  kneepads: true,
-})
-
-const SHADOW = [30, 16, 52], WARM = [255, 240, 214], NIGHT = [12, 8, 26]
-
-export function hexColor(h) {
-  const n = parseInt(String(h).replace('#', ''), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t))
-
-// Shade toward a cool violet and light toward a warm white: hue-shifted
-// ramps read as painted pixel art, where plain darkening reads as mud.
-export function ramp(base, { shade = 0.42, light = 0.3 } = {}) {
-  const c = hexColor(base)
-  return [c, mix(c, SHADOW, shade), mix(c, WARM, light)]
+export function defineSkin({ name, sheet, recolor = null }) {
+  if (!name || !sheet) throw new Error('A skin needs a name and a sheet')
+  for (const part of Object.keys(recolor || {})) {
+    if (part !== 'all' && !(part in PART)) throw new Error(`Skin "${name}" recolours an unknown part: ${part}`)
+  }
+  return Object.freeze({ name, sheet, recolor })
 }
 
-export function defineSkin({ name, colors, style = {}, ramps = {} }) {
-  const c = { outline: '#140c1e', eye: '#1b1024', ...colors }
-  c.sleeve ??= c.top; c.collar ??= c.trim; c.band ??= c.trim; c.glove ??= c.skin; c.pad ??= c.pants
-  for (const m of MATERIALS) if (!c[m]) throw new Error(`Skin ${name} is missing a ${m} colour`)
-  return Object.freeze({ name, colors: Object.freeze(c), style: Object.freeze({ ...STYLE_DEFAULTS, ...style }), ramps })
+export const SKINS = {
+  courier: defineSkin({ name: 'Courier', sheet: 'v2/courier-rig.png' }),
+  windbreaker: defineSkin({ name: 'Windbreaker', sheet: 'v2/windbreaker-rig.png' }),
+  techwear: defineSkin({ name: 'Techwear', sheet: 'v2/techwear-rig.png' }),
 }
 
-// Little-endian RGBA lookup for every index byte the rasterizer can write.
-export function paletteOf(skin) {
-  const lut = new Uint32Array(256)
-  const pack = ([r, g, b]) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0
-  for (const m of MATERIALS) {
-    const id = MAT[m], tones = m === 'outline' ? [hexColor(skin.colors.outline), hexColor(skin.colors.outline), hexColor(skin.colors.outline)] : ramp(skin.colors[m], skin.ramps[m])
-    for (let t = 0; t < 3; t++) {
-      lut[(id << 2) | t] = pack(tones[t])
-      // Far limbs sit in the body's shadow.
-      lut[(id << 2) | t | FAR] = pack(m === 'outline' ? tones[t] : mix(tones[t], NIGHT, 0.34))
+// The recolour rules that apply to one part: `all` first, then its own.
+// A rule (or an array of them) is { hue, sat, light, tint, where }:
+//   hue    degrees to rotate the hue by
+//   tint   '#rrggbb': take this colour's hue and saturation, keep the shading
+//   sat    saturation multiplier        light  lightness multiplier
+//   where  [fromHue, toHue] in degrees: only touch pixels in this hue range
+//          (wraps past 360), e.g. the red of a glove but not the fingers
+export function rulesFor(skin, part) {
+  const r = skin.recolor
+  return r ? [r.all, r[part]].flat().filter(Boolean) : []
+}
+
+function toHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min
+  if (!d) return [0, 0, l]
+  const s = d / (1 - Math.abs(2 * l - 1))
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return [h * 60, s, l]
+}
+
+function toRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)]
+}
+
+const clamp01 = v => Math.max(0, Math.min(1, v))
+
+// Recolour RGBA pixels in place. Alpha is never touched, so a recolour cannot
+// change a part's silhouette.
+export function recolorPixels(rgba, rules) {
+  for (const rule of [rules].flat()) {
+    const tint = rule.tint ? toHsl(...[1, 3, 5].map(i => parseInt(rule.tint.slice(i, i + 2), 16))) : null
+    const [from, to] = rule.where || [0, 360]
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (!rgba[i + 3]) continue
+      let [h, s, l] = toHsl(rgba[i], rgba[i + 1], rgba[i + 2])
+      if (rule.where && (s < 0.08 || !(from <= to ? h >= from && h <= to : h >= from || h <= to))) continue
+      if (tint) { h = tint[0]; s = tint[1] * (rule.where ? 1 : Math.min(1, s * 2 + 0.5)) }
+      h = (((h + (rule.hue || 0)) % 360) + 360) % 360
+      s = clamp01(s * (rule.sat ?? 1)); l = clamp01(l * (rule.light ?? 1))
+      const rgb = toRgb(h, s, l)
+      rgba[i] = rgb[0]; rgba[i + 1] = rgb[1]; rgba[i + 2] = rgb[2]
     }
   }
-  return lut
+  return rgba
 }
-
-export const SKINS = Object.freeze({
-  courier: defineSkin({
-    name: 'Courier',
-    colors: {
-      skin: '#d99a72', hair: '#5a3424', top: '#ddd6ca', trim: '#ff3b30', pants: '#3b3352', pad: '#7a7088',
-      shoe: '#ff3b30', sole: '#f2ece2', glove: '#d8302b', belt: '#231d2c', band: '#e8e4ee',
-    },
-    style: { sleeves: 'none', midriff: true, gloves: true },
-  }),
-  windbreaker: defineSkin({
-    name: 'Windbreaker',
-    colors: {
-      skin: '#cf9068', hair: '#4a2a20', top: '#f0642c', trim: '#2fe3ff', pants: '#2e2c44', pad: '#6a6880',
-      shoe: '#ece8f2', sole: '#a7a3b6', glove: '#26232f', belt: '#1f1c28', collar: '#3bc2d4', band: '#e8e4ee',
-    },
-    style: { sleeves: 'long', gloves: true, collar: true, zip: true },
-  }),
-  techwear: defineSkin({
-    name: 'Techwear',
-    colors: {
-      skin: '#d49b78', hair: '#e6e2ee', top: '#2b2e40', trim: '#2fe3ff', pants: '#22232f', pad: '#4b4d60',
-      shoe: '#dcdee8', sole: '#8a8ca0', glove: '#15161d', belt: '#14151c', collar: '#b52a35', band: '#2fe3ff',
-    },
-    style: { sleeves: 'long', gloves: true, collar: true, zip: true },
-  }),
-})

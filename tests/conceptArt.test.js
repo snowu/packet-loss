@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { atlasCell, KIT } from '../src/pixel/conceptArt.js'
 import { decodePng } from '../scripts/png.mjs'
 import { serviceWorker } from '../vite.config.js'
+import { SKINS } from '../src/pixel/rig/skins.js'
 
 describe('production concept art', () => {
   it('covers every atlas pixel exactly once even when dimensions do not divide by four', () => {
@@ -33,6 +34,6 @@ describe('production concept art', () => {
 
   it('precaches all production artwork for offline play', () => {
     const sw = serviceWorker('test', [])
-    for (const name of ['environment-atlas.png', 'skyline.png']) expect(sw).toContain(`concept-art/${name}`)
+    for (const name of ['environment-atlas.png', 'skyline.png', ...Object.values(SKINS).map(skin => skin.sheet)]) expect(sw).toContain(`concept-art/${name}`)
   })
 })

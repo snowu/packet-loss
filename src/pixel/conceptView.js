@@ -6,6 +6,7 @@ import { PPU } from './sprites.js'
 import { FocusFilter } from './focus.js'
 import { RunGait, RUN_STRIDE, STANCE } from './runGait.js'
 import { RunnerRig, RUN_ORIGIN } from './rig/index.js'
+import { FRAME } from './runnerModel.js'
 
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -19,7 +20,7 @@ export class ConceptView extends PixelView {
     this.gait = new RunGait()
     this.ghostGait = new RunGait()
     // One rig each for the player and the ghost. The skeleton and its
-    // animation are shared by every outfit; the outfit is only a palette.
+    // animation are shared by every outfit; the outfit is only its painted parts.
     this.rig = new RunnerRig(this.runnerId)
     this.ghostRig = new RunnerRig(this.runnerId)
     this.backgrounds = new Map()
@@ -283,7 +284,10 @@ export class ConceptView extends PixelView {
     const im = rig.image()
     ctx.save()
     if (ghost) { ctx.globalAlpha *= 0.5; ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)' }
-    ctx.drawImage(im, x - RUN_ORIGIN[0], y - RUN_ORIGIN[1], im.width / 2, im.height / 2)
+    // The sprite is drawn at twice the screen's resolution and averaged down
+    // onto whole device pixels, so its edges are clean and it does not shimmer.
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(im, Math.round((x - RUN_ORIGIN[0]) * 2) / 2, Math.round((y - RUN_ORIGIN[1]) * 2) / 2, FRAME.width / FRAME.scale, FRAME.height / FRAME.scale)
     ctx.restore()
   }
 
