@@ -15,11 +15,13 @@ changes from master.
 
 ## Implementation
 
-- The canvas is as sharp as the display it is shown on: 2 to 4 backing pixels
+- The canvas is as sharp as the display it is shown on: 2 or 3 backing pixels
   per logical pixel at full quality (it was fixed at 2 and stretched by the
   browser), and 2 at reduced quality levels. World coordinates and physics
   stay in the same units. Above 2x, artwork is reduced with proper filtering;
-  at 2x it is sampled nearest-neighbour as before.
+  at 2x it is sampled nearest-neighbour as before. While the focus effect is
+  on the frame is drawn at 2x, since focus filters every pixel and softens
+  the picture anyway; artwork cached for each resolution is kept.
 - Courier, Windbreaker and Techwear are painted part sheets on one rigged skeleton
   ([runner rig](runner-rig.md)). Every move is posed live and crossfaded:
   running, airborne movement, sliding, vaulting, mantling, hanging, climbing,

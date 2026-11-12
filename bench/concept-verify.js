@@ -53,7 +53,7 @@ try {
       for (let i = 0; i < 900; i++) { window.__tick(); if (i % 120 === 0) await window.__yield() }
       runs.push({ mode, distance: G.g.player.x, materials: v.materials.size, kit: v.kitCache.size })
     }
-    return { poses: poses.size, runs, doubled: v.res >= 2 && v.res <= 4 && v.canvas.width === v.W * v.res && v.canvas.height === v.logicalH * v.res, backgrounds: v.backgrounds.size }
+    return { poses: poses.size, runs, doubled: v.res >= 2 && v.res <= 3 && v.canvas.width === v.W * v.res && v.canvas.height === v.logicalH * v.res, backgrounds: v.backgrounds.size }
   })
   assert.equal(result.poses, 39); assert.ok(result.doubled)
   for (const run of result.runs) { assert.ok(run.distance > 70); assert.ok(run.materials < 12); assert.ok(run.kit <= 96) }
