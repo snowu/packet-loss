@@ -15,9 +15,13 @@ changes from master.
 
 ## Implementation
 
-- The canvas has twice the previous raster resolution in each axis. World
-  coordinates and physics stay in the same units; image assets draw into this
-  higher-resolution surface with nearest-neighbour sampling.
+- The canvas is as sharp as the display it is shown on: 2 or 3 backing pixels
+  per logical pixel at full quality (it was fixed at 2 and stretched by the
+  browser), and 2 at reduced quality levels. World coordinates and physics
+  stay in the same units. Above 2x, artwork is reduced with proper filtering;
+  at 2x it is sampled nearest-neighbour as before. While the focus effect is
+  on the frame is drawn at 2x, since focus filters every pixel and softens
+  the picture anyway; artwork cached for each resolution is kept.
 - Courier, Windbreaker and Techwear are painted part sheets on one rigged skeleton
   ([runner rig](runner-rig.md)). Every move is posed live and crossfaded:
   running, airborne movement, sliding, vaulting, mantling, hanging, climbing,
@@ -30,8 +34,19 @@ changes from master.
   crate, overhead pipe, springboard, duct, data shard, wall panel, cables and
   facade materials. Procedural course geometry determines object placement and
   size. Pipe barrels and wall-run panels align with their simulation regions.
+- Background props are laid out per building by `src/pixel/roofDecor.js`:
+  single props and small arrangements of tanks, air handlers, vents, ducts
+  and junction boxes, in three sizes, mirrored and weathered, with uneven
+  gaps and no arrangement repeated back to back.
+- Billboards keep the painted frame and show one of sixteen adverts (a
+  mascot and a brand name) in one of six light colours and three sizes. No
+  roof repeats an advert.
 - Textured facades, roof slabs and their coping replace the old generated
-  facades. Wet roofs expose segmented reflections. A painted scrolling skyline,
+  facades. Paving starts at a different point on every building, with
+  per-building worn patches and standing water. Reflections on the roof are
+  cast by the lights standing on it: each billboard in its own colour, its
+  lamps, and the moon. They are strong on a wet roof and faint on a dry one.
+  The pink and amber streaks painted into the roof tile are removed. A painted scrolling skyline,
   moon, atmosphere and palette treatments supply all five districts.
 - Textures, actor frames and district backgrounds are prepared/cached rather
   than resampled or recoloured every frame. Facades are released when their

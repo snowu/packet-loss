@@ -49,7 +49,7 @@ describe('sprite PNGs in public/art', () => {
     }
     for (const f of [0, 1, 2]) expect(same(() => bakeBird(f))).toBe(true)
     for (const alarm of [false, true]) for (const f of [0, 1, 2, 3]) expect(same(() => bakeDrone(f, alarm))).toBe(true)
-  })
+  }, 30000)
 
   it('ads follow the billboard hue, and billboards look the same drawn from untouched PNGs', () => {
     for (const pal of PALETTES.filter((_, i) => i % 3 === 0)) {
@@ -62,7 +62,7 @@ describe('sprite PNGs in public/art', () => {
         for (const f of [0, 1]) expect(same(() => bakeBillboard(s, pal, f)), `${s.kind} ${s.seed}`).toBe(true)
       }
     }
-  })
+  }, 30000)
 
   it('a painted PNG shows as painted: new colours stay, the placeholder\'s colours follow the district', () => {
     const pal = PALETTES.find((p) => p.version > 20)

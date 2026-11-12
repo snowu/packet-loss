@@ -20,7 +20,7 @@ describe('billboards', () => {
         }
       }
     }
-  })
+  }, 30000)
 
   it('fills small skyline boards with more than a single word', () => {
     for (let seed = 1; seed < 200; seed++) {

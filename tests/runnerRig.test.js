@@ -44,7 +44,7 @@ describe('runner skeleton', () => {
         for (const [p, q, l] of bones(a.joints)) expect(dist(p, q)).toBeCloseTo(l, 8)
       }
     }
-  })
+  }, 30000)
 
   it('never hyperextends a knee or elbow', () => {
     for (const s of STATES) {

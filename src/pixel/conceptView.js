@@ -1,7 +1,10 @@
 import { PixelView } from './view.js'
 import { conceptArt, KIT } from './conceptArt.js'
 import { paletteAt } from './palette.js'
-import { css, hash, mix } from './pixels.js'
+import { css, hash, mix, pack, PixelBuffer, toCanvas } from './pixels.js'
+import { roofDecor } from './roofDecor.js'
+import { ADS } from './billboard.js'
+import { artSize, artColors, drawArt, drawBig, bigW } from './art.js'
 import { PPU } from './sprites.js'
 import { FocusFilter } from './focus.js'
 import { RunGait, RUN_STRIDE, STANCE } from './runGait.js'
@@ -10,6 +13,10 @@ import { FRAME } from './runnerModel.js'
 
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+
+// The sharpest the canvas gets, in backing pixels per logical pixel. Beyond
+// this the artwork has no more detail to show and every frame costs more.
+const MAX_RES = 3
 
 // Same world coordinates and collision geometry, twice the raster resolution.
 // The approved artwork is drawn directly, rather than traced into stick sprites.
@@ -26,26 +33,50 @@ export class ConceptView extends PixelView {
     this.backgrounds = new Map()
     this.materials = new Map()
     this.kitCache = new Map()
+    // Material tiles are kept at 4x, sharper than the canvas ever gets.
     this.facadeTiles = [KIT.concrete, KIT.industrial].map(id => {
-      const cv = document.createElement('canvas'); cv.width = 210; cv.height = 164
-      const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(this.art.kit[id], 0, 0, 210, 164)
+      const cv = document.createElement('canvas'); cv.width = 420; cv.height = 328
+      const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(this.art.kit[id], 0, 0, 420, 328)
       return cv
     })
-    this.roofTile = document.createElement('canvas'); this.roofTile.width = 190; this.roofTile.height = 26
-    const roof = this.art.kit[KIT.roof], sy = Math.floor(roof.height * 0.64)
-    const roofCtx = this.roofTile.getContext('2d'); roofCtx.imageSmoothingEnabled = false
-    roofCtx.drawImage(roof, 0, sy, roof.width, roof.height - sy, 0, 0, 190, 26)
+    this.roofTile = this.paving()
+    // A jump pad is flush with the roof, so it shows only the springboard's
+    // plate, not the coil and base that stand a launch spring off the roof.
+    const spring = this.art.kit[KIT.spring]
+    this.plateArt = document.createElement('canvas'); this.plateArt.width = spring.width; this.plateArt.height = Math.round(spring.height * 0.55)
+    this.plateArt.getContext('2d').drawImage(spring, 0, 0)
+    this.decor = new WeakMap()
     document.body.classList.add('concept-art')
+  }
+
+  // Backing pixels per logical pixel. The artwork is far larger than the
+  // 270-line logical screen, so at full quality the canvas is as sharp as
+  // the display it is shown on (up to 3x) instead of a fixed 2x that the
+  // browser then stretches. Lower quality levels stay at 2x.
+  resolution() {
+    if (this.quality > 0) return 2
+    const shown = parseFloat(this.canvas.style.width) / this.W || 2
+    return clamp(Math.ceil(shown * (window.devicePixelRatio || 1) - 0.05), 2, MAX_RES)
   }
 
   resize() {
     super.resize()
     this.logicalH = this.canvas.height
-    this.canvas.width *= 2; this.canvas.height *= 2
-    this.ctx.imageSmoothingEnabled = false
-    this.ctx.setTransform(2, 0, 0, 2, 0, 0)
+    this.res = 0; this.resQuality = this.quality
+    this.setRes(this.resolution())
     if (this.materials) { for (const cv of this.materials.values()) cv.width = cv.height = 0; this.materials.clear() }
     if (this.backgrounds) { for (const cv of this.backgrounds.values()) cv.width = cv.height = 0; this.backgrounds.clear() }
+    if (this.kitCache) { for (const cv of this.kitCache.values()) cv.width = cv.height = 0; this.kitCache.clear() }
+  }
+
+  // Change the backing resolution in place. Cached artwork is keyed by the
+  // resolution it was made for and is kept, so switching back is free.
+  setRes(res) {
+    if (res === this.res) return
+    this.res = res
+    this.canvas.width = this.W * res; this.canvas.height = this.logicalH * res
+    this.ctx.imageSmoothingEnabled = false
+    this.ctx.setTransform(res, 0, 0, res, 0, 0)
   }
 
   snap(x, y) { super.snap(x, y); this.cam.x = x + this.W * 0.18 / PPU; this.cam.y = y + 3.8 }
@@ -76,8 +107,13 @@ export class ConceptView extends PixelView {
 
   frame(s) {
     const pal = paletteAt(s.paletteD ?? s.distance), ctx = this.ctx
+    if (this.quality !== this.resQuality) this.resize()
+    // The focus effect filters every pixel of the frame and softens it
+    // anyway, so the frame is drawn at 2x for as long as it is on.
+    this.setRes(s.focusVis > 0.02 ? 2 : this.resolution())
+    const res = this.res
     this.pal = pal; this.stale = false; this.budget = 2
-    ctx.setTransform(2, 0, 0, 2, 0, 0)
+    ctx.setTransform(res, 0, 0, res, 0, 0)
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'
     if (s.mode !== 'paused') {
       // The visible contact and its sound share one distance-driven clock.
@@ -144,7 +180,7 @@ export class ConceptView extends PixelView {
       const x = i * w - offset
       // Alternating mirrored repeats keep the skyline continuous at its edges.
       const segment = Math.floor(this.cam.x * PPU * 0.1 / w) + i
-      if (segment & 1) { ctx.setTransform(-2, 0, 0, 2, (x + w) * 2, 0); ctx.drawImage(bg, 0, 0, w, H); ctx.setTransform(2, 0, 0, 2, 0, 0) }
+      if (segment & 1) { ctx.setTransform(-this.res, 0, 0, this.res, (x + w) * this.res, 0); ctx.drawImage(bg, 0, 0, w, H); ctx.setTransform(this.res, 0, 0, this.res, 0, 0) }
       else ctx.drawImage(bg, x, 0, w, H)
     }
     if (pal.moon) {
@@ -156,29 +192,129 @@ export class ConceptView extends PixelView {
     }
   }
 
-  kit(id, x, y, w, h) {
+  // The roof study's paving, without the coloured reflections painted into
+  // it. Those were the same pink and amber streaks on every roof, under no
+  // light at all; reflections are now cast by the lights that are there.
+  paving() {
+    const roof = this.art.kit[KIT.roof], sy = Math.floor(roof.height * 0.64), sh = roof.height - sy
+    const cv = document.createElement('canvas'); cv.width = 380; cv.height = 52
+    const c = cv.getContext('2d', { willReadFrequently: true }); c.imageSmoothingEnabled = false
+    c.drawImage(roof, 0, sy, roof.width, sh, 0, 0, 380, 52)
+    const image = c.getImageData(0, 0, 380, 52), d = image.data
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2], max = Math.max(r, g, b), min = Math.min(r, g, b)
+      if (max - min < 46) continue
+      // Keep the shading, drop the colour: a lit streak becomes plain stone.
+      const l = Math.min(118, (max + min) / 2 * 0.8 + 18)
+      d[i] = l * 0.93; d[i + 1] = l * 0.86; d[i + 2] = l * 1.08
+    }
+    c.putImageData(image, 0, 0)
+    return cv
+  }
+
+  // A light's reflection on the roof under it: a streak of its own colour,
+  // broken where the paving is rough, strong on a wet roof and faint on a
+  // dry one. Painted into `overlay`, the roof's one-pixel-per-unit light layer.
+  reflect(overlay, seed, x, w, color, strength) {
+    if (strength < 0.02) return
+    for (let i = 0; i < w; i++) {
+      const edge = Math.min(1, Math.min(i, w - 1 - i) / (w * 0.28) + 0.15)
+      const column = (0.35 + 0.65 * hash(seed, Math.floor((x + i) / 2), 91)) * edge * strength
+      for (let row = 1; row < 12; row++) {
+        if (hash(seed, x + i, 92 + row) < 0.22) continue
+        overlay.add(x + i, row, color, column * (1 - row / 15))
+      }
+    }
+  }
+
+  // One advert on the painted billboard frame: a mascot and a brand name in
+  // the billboard's own light colour.
+  billboard(item, pal) {
+    const key = `ad:${item.ad}:${item.color.join()}:${item.w}:${item.h}:${this.res}`
+    let im = this.kitCache.get(key)
+    if (im) return im
+    const res = this.res, ad = ADS[item.ad % ADS.length]
+    im = document.createElement('canvas'); im.width = item.w * res; im.height = item.h * res
+    const c = im.getContext('2d'); this.shrink(c, this.art.kit[KIT.sign], im.width, im.height)
+    // The panel inside the painted frame.
+    const px = Math.round(item.w * 0.15), py = Math.round(item.h * 0.235), pw = Math.round(item.w * 0.77), ph = Math.round(item.h * 0.475)
+    c.setTransform(res, 0, 0, res, 0, 0)
+    c.fillStyle = css(mix([18, 12, 24], item.color, 0.1)); c.fillRect(px, py, pw, ph)
+    const b = new PixelBuffer(pw, ph), ink = pack(item.color), dim = pack(mix(item.color, [14, 10, 22], 0.6))
+    const lines = ad.brand.split(' '), textW = Math.max(...lines.map(bigW))
+    const art = ad.art, [aw, ah] = art ? artSize(art) : [0, 0]
+    const beside = art && aw + 3 + textW <= pw - 2 && ah <= ph - 2
+    if (art && (beside || ah + 9 <= ph)) {
+      const ax = beside ? Math.max(1, Math.floor((pw - aw - 3 - textW) / 2)) : Math.floor((pw - aw) / 2)
+      drawArt(b, art, ax, beside ? Math.floor((ph - ah) / 2) : 1, artColors(item.color, pal, [60, 40, 90]))
+    }
+    const tx = beside ? Math.floor((pw - aw - 3 - textW) / 2) + aw + 3 : 0, tw = beside ? textW : pw
+    const top = beside ? Math.floor((ph - lines.length * 9 + 2) / 2) : ph - (art ? 8 : Math.floor((ph + lines.length * 9) / 2))
+    const shown = beside || !art ? lines : [lines[0]]
+    shown.forEach((line, n) => { if (bigW(line) <= pw) drawBig(b, line, tx + Math.floor((tw - bigW(line)) / 2), top + n * 9, ink, dim) })
+    c.imageSmoothingEnabled = false; c.drawImage(toCanvas(b), px, py)
+    // Light spilling off the panel onto its frame.
+    c.globalCompositeOperation = 'source-atop'; c.fillStyle = css(item.color, 0.12); c.fillRect(0, 0, item.w, item.h)
+    this.cacheKit(key, im)
+    return im
+  }
+
+  cacheKit(key, im) {
+    if (this.kitCache.size >= 192) { const oldest = this.kitCache.keys().next().value; const old = this.kitCache.get(oldest); old.width = old.height = 0; this.kitCache.delete(oldest) }
+    this.kitCache.set(key, im)
+  }
+
+  decorFor(c, w) {
+    let items = this.decor.get(c)
+    if (!items) { items = roofDecor(c.seed, w, ADS.length); this.decor.set(c, items) }
+    return items
+  }
+
+  // Reduce artwork onto `c`. At 2x the source's own pixels are sampled
+  // directly, as before; above that there is room to filter properly, in
+  // halving steps so every source pixel contributes.
+  shrink(c, image, w, h) {
+    if (this.res < 3) { c.imageSmoothingEnabled = false; c.drawImage(image, 0, 0, w, h); return }
+    let src = image
+    while (src.width > w * 2 && src.height > h * 2) {
+      const half = document.createElement('canvas'); half.width = Math.ceil(src.width / 2); half.height = Math.ceil(src.height / 2)
+      const hc = half.getContext('2d'); hc.imageSmoothingQuality = 'high'; hc.drawImage(src, 0, 0, half.width, half.height)
+      src = half
+    }
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.drawImage(src, 0, 0, w, h)
+  }
+
+  // shade: 0..2 weathers the prop a little darker; flip mirrors it.
+  kit(id, x, y, w, h, shade = 0, flip = false) {
     const n = typeof id === 'string' ? KIT[id] : id
     w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h))
-    const key = `${n}:${w}:${h}`
+    const key = `${n ?? id}:${w}:${h}:${shade}:${this.res}`
     let im = this.kitCache.get(key)
     if (!im) {
-      im = document.createElement('canvas'); im.width = w * 2; im.height = h * 2
-      const c = im.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(this.art.kit[n], 0, 0, im.width, im.height)
-      if (this.kitCache.size >= 96) { const oldest = this.kitCache.keys().next().value; const old = this.kitCache.get(oldest); old.width = old.height = 0; this.kitCache.delete(oldest) }
-      this.kitCache.set(key, im)
+      im = document.createElement('canvas'); im.width = w * this.res; im.height = h * this.res
+      const c = im.getContext('2d'); this.shrink(c, id === 'plate' ? this.plateArt : this.art.kit[n], im.width, im.height)
+      if (shade) { c.globalCompositeOperation = 'source-atop'; c.fillStyle = shade === 1 ? '#0a061838' : '#2a140a30'; c.fillRect(0, 0, im.width, im.height) }
+      this.cacheKit(key, im)
     }
-    this.ctx.drawImage(im, Math.round(x), Math.round(y), w, h)
+    this.blit(im, x, y, w, h, flip)
+  }
+
+  blit(im, x, y, w, h, flip = false) {
+    const ctx = this.ctx, res = this.res
+    x = Math.round(x); y = Math.round(y)
+    if (!flip) { ctx.drawImage(im, x, y, w, h); return }
+    ctx.setTransform(-res, 0, 0, res, (x + w) * res, y * res); ctx.drawImage(im, 0, 0, w, h); ctx.setTransform(res, 0, 0, res, 0, 0)
   }
 
   building(c, pal) {
-    const key = `${c.id}:${pal.name}:${Math.round(this.weather.wet * 3)}`
+    const key = `${c.id}:${this.res}:${pal.name}:${Math.round(this.weather.wet * 3)}`
     let cv = this.materials.get(key)
     if (cv) return cv
-    for (const [old, image] of this.materials) if (old.startsWith(`${c.id}:`)) { image.width = image.height = 0; this.materials.delete(old) }
+    for (const [old, image] of this.materials) if (old.startsWith(`${c.id}:${this.res}:`)) { image.width = image.height = 0; this.materials.delete(old) }
     // Each facade is cached once, and released after its chunk leaves view.
     const w = Math.max(1, Math.round((c.x1 - c.x0) * PPU)), h = Math.min(440, this.logicalH + 60)
-    cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2
-    const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.imageSmoothingEnabled = false
+    cv = document.createElement('canvas'); cv.width = w * this.res; cv.height = h * this.res
+    const ctx = cv.getContext('2d'); ctx.scale(this.res, this.res); ctx.imageSmoothingEnabled = false
     const im = this.facadeTiles[hash(c.seed, 4) < 0.5 ? 0 : 1]
     ctx.fillStyle = '#1b172a'; ctx.fillRect(0, 0, w, h)
     const tw = 105, th = 82
@@ -186,9 +322,44 @@ export class ConceptView extends PixelView {
     const fade = ctx.createLinearGradient(0, 0, 0, h * 0.65)
     fade.addColorStop(0, '#0b081520'); fade.addColorStop(1, '#090712ef')
     ctx.fillStyle = fade; ctx.fillRect(0, 0, w, h)
-    // Use only the material surface of the roof study, excluding its scenery.
-    for (let x = 0; x < w; x += 95) ctx.drawImage(this.roofTile, x, 0, 95, 13)
-    if (this.weather.wet < 0.3) { ctx.fillStyle = css(pal.roof, 0.45); ctx.fillRect(0, 1, w, 11) }
+    // Paving: each building starts the slab pattern somewhere else and lays
+    // alternate slabs mirrored, so no two roofs crack in the same places.
+    const start = -Math.floor(hash(c.seed, 61) * 95)
+    for (let x = start, n = Math.floor(hash(c.seed, 62) * 2); x < w; x += 95, n++) {
+      if (n & 1) { ctx.save(); ctx.translate(x + 95, 0); ctx.scale(-1, 1); ctx.drawImage(this.roofTile, 0, 0, 95, 13); ctx.restore() }
+      else ctx.drawImage(this.roofTile, x, 0, 95, 13)
+    }
+    const wet = this.weather.wet
+    if (wet < 0.3) { ctx.fillStyle = css(pal.roof, 0.45); ctx.fillRect(0, 1, w, 11) }
+    // Everything laid over the paving goes into one small image, composited
+    // in a single draw however many patches and lights the roof has.
+    const overlay = new ImageData(w, 13), px = overlay.data
+    overlay.add = (ox, oy, color, alpha) => {
+      if (ox < 0 || ox >= w || oy < 0 || oy >= 13 || alpha <= 0) return
+      const i = (oy * w + ox) * 4, a0 = px[i + 3] / 255, a = alpha + a0 * (1 - alpha)
+      for (let k = 0; k < 3; k++) px[i + k] = (color[k] * alpha + px[i + k] * a0 * (1 - alpha)) / a
+      px[i + 3] = a * 255
+    }
+    // Worn patches and standing water, placed per building.
+    const sheen = mix(pal.haze, [200, 205, 225], 0.4)
+    for (let i = 0, n = Math.floor(w / 70); i < n; i++) {
+      const bx = Math.floor(hash(c.seed, i, 63) * w), bw = 10 + Math.floor(hash(c.seed, i, 64) * 26), by = 2 + Math.floor(hash(c.seed, i, 65) * 7)
+      const worn = hash(c.seed, i, 66) < 0.5, color = worn ? [11, 8, 26] : sheen, alpha = worn ? 0.25 : 0.05 + wet * 0.12
+      for (let k = 0; k < bw; k++) { overlay.add(bx + k, by, color, alpha); overlay.add(bx + k, by + 1, color, alpha); if (k >= 3 && k < bw - 5) overlay.add(bx + k, by + 2, color, alpha) }
+    }
+    // Reflections come from the lights standing on this roof: each billboard
+    // in its own colour, and the warm lamps over it.
+    const gloss = 0.16 + wet * 0.6
+    for (const item of this.decorFor(c, w)) {
+      if (item.id !== 'sign') continue
+      this.reflect(overlay, c.seed, item.x + 4, item.w - 8, item.color, gloss)
+      this.reflect(overlay, c.seed + 1, item.x + Math.round(item.w * 0.2), 5, [255, 200, 120], gloss * 0.8)
+      this.reflect(overlay, c.seed + 2, item.x + Math.round(item.w * 0.68), 5, [255, 200, 120], gloss * 0.8)
+    }
+    if (pal.moon && wet > 0.2) this.reflect(overlay, c.seed + 3, Math.floor(hash(c.seed, 67) * Math.max(1, w - 30)), 22, [200, 220, 235], wet * 0.16)
+    const lit = document.createElement('canvas'); lit.width = w; lit.height = 13
+    lit.getContext('2d').putImageData(overlay, 0, 0)
+    ctx.drawImage(lit, 0, 0, w, 13); lit.width = lit.height = 0
     ctx.fillStyle = '#120e22'; ctx.fillRect(0, 13, w, 3)
     ctx.fillStyle = '#b5a5c0'; ctx.fillRect(0, 12, w, 1)
     ctx.fillStyle = '#8c7e9d'; ctx.fillRect(0, 0, w, 1)
@@ -210,23 +381,15 @@ export class ConceptView extends PixelView {
       }
       for (const panel of c.wallruns) this.kit('wallrun', this.sx(panel.x0), this.sy(panel.y1), this.sx(panel.x1) - this.sx(panel.x0), this.sy(panel.y0) - this.sy(panel.y1))
       const facade = this.building(c, pal)
-      ctx.drawImage(facade, x, y - 13, w, facade.height / 2)
+      ctx.drawImage(facade, x, y - 13, w, facade.height / this.res)
       if (!this.hide.decor) {
-        // The curated kit replaces all miniature generated roof equipment.
-        // A deterministic sparse arrangement leaves the play lane uncluttered.
-        const slots = Math.max(1, Math.floor(w / 135))
-        for (let i = 0; i < slots; i++) {
-          const px = x + 28 + i * 135 + hash(c.seed, i, 18) * 20
-          const variant = i === 0 && w > 175 && hash(c.seed, 21) < 0.6 ? 3 : Math.floor(hash(c.seed, i, 19) * 4)
-          const id = ['tank', 'ac', 'vent', 'sign'][variant]
-          const [dw, dh] = { tank: [42, 68], ac: [37, 27], vent: [35, 31], sign: [58, 66] }[id]
-          if (px + dw > x + w - 6) continue
-          ctx.fillStyle = '#09061180'; ctx.fillRect(Math.round(px - 2), y - 14, dw + 4, 3)
-          this.kit(id, px, y - 14 - dh, dw, dh)
-          if (id === 'sign' && this.weather.wet > 0.15) {
-            ctx.fillStyle = css([255, 104, 173], this.weather.wet * 0.28)
-            ctx.fillRect(Math.round(px + 8), y - 10, 12, 1); ctx.fillRect(Math.round(px + 28), y - 5, 18, 1)
-          }
+        // Props stand behind the play lane, laid out per building.
+        for (const item of this.decorFor(c, w)) {
+          const px = x + item.x, top = y - 14 - item.h
+          if (px + item.w < -4 || px > this.W + 4) continue
+          ctx.fillStyle = '#09061180'; ctx.fillRect(px - 2, y - 14, item.w + 4, 3)
+          if (item.id === 'sign') this.blit(this.billboard(item, pal), px, top, item.w, item.h)
+          else this.kit(item.id, px, top, item.w, item.h, item.shade, item.flip)
         }
       }
       if (this.hide.course) continue
@@ -245,7 +408,6 @@ export class ConceptView extends PixelView {
       }
       for (const q of c.pads ?? []) {
         const qx = this.sx(q.x0), qw = this.sx(q.x1) - qx
-        this.kit('spring', qx, this.sy(q.y) - 9, qw, 9)
         this.drawPad(q, s.p, this.cam.time)
       }
       for (const e of c.extras) if (e.type === 'ledge') { ctx.fillStyle = '#ff493d'; ctx.fillRect(this.sx(e.x), this.sy(e.y), 5, 2) }
@@ -278,6 +440,30 @@ export class ConceptView extends PixelView {
     this.wrecks = this.wrecks.filter(w => { w.life -= s.dt; w.vy -= 30 * s.dt; w.x += w.vx * s.dt; w.y += w.vy * s.dt; if (w.life <= 0) return false; ctx.save(); ctx.globalAlpha = Math.min(1, w.life * 2); this.kit('drone', this.sx(w.x) - 12, this.sy(w.y), 24, 13); ctx.restore(); return true })
   }
 
+  // A jump pad: the springboard's plate set into the roof, a column of light
+  // over it and chevrons drifting up. The base renderer's flat plate is not
+  // drawn over the artwork.
+  drawPad(q, p, t) {
+    const ctx = this.ctx, x0 = this.sx(q.x0), x1 = this.sx(q.x1), y = this.sy(q.y), w = x1 - x0
+    if (x1 < 0 || x0 > this.W) return
+    const on = p.x >= q.x0 && p.x <= q.x1 && Math.abs(p.y - q.y) < 0.05
+    ctx.fillStyle = on ? '#ff493d4d' : css([255, 73, 61], 0.12 + 0.06 * Math.sin(t * 6))
+    ctx.fillRect(x0 + 2, y - 34, w - 4, 30)
+    ctx.fillStyle = '#0906118c'; ctx.fillRect(x0 - 1, y - 1, w + 2, 2)
+    this.kit('plate', x0 - 1, y - 9, w + 2, 9)
+    if (on) { ctx.fillStyle = '#ffffff66'; ctx.fillRect(x0, y - 8, w, 7) }
+    ctx.fillStyle = on ? '#ffffff' : '#ff493d'
+    const cx = (x0 + x1) >> 1
+    for (let i = 0; i < 3; i++) {
+      const k = (t * 1.4 + i / 3) % 1
+      ctx.globalAlpha = (on ? 1 : 0.8) * (1 - k * 0.8)
+      const cy = y - 13 - Math.round(k * 22)
+      ctx.fillRect(cx - 5, cy + 3, 2, 2); ctx.fillRect(cx - 3, cy + 1, 2, 2); ctx.fillRect(cx - 1, cy - 1, 2, 2)
+      ctx.fillRect(cx + 1, cy + 1, 2, 2); ctx.fillRect(cx + 3, cy + 3, 2, 2)
+    }
+    ctx.globalAlpha = 1
+  }
+
   drawActor(p, x, y, time, idle = false, ghost = false, phase = (p.x ?? time * 12) / RUN_STRIDE) {
     const rig = ghost ? this.ghostRig : this.rig, ctx = this.ctx
     rig.update(p, time, phase, idle, p.x ?? 0, p.y ?? 0)
@@ -287,7 +473,8 @@ export class ConceptView extends PixelView {
     // The sprite is drawn at twice the screen's resolution and averaged down
     // onto whole device pixels, so its edges are clean and it does not shimmer.
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(im, Math.round((x - RUN_ORIGIN[0]) * 2) / 2, Math.round((y - RUN_ORIGIN[1]) * 2) / 2, FRAME.width / FRAME.scale, FRAME.height / FRAME.scale)
+    const res = this.res
+    ctx.drawImage(im, Math.round((x - RUN_ORIGIN[0]) * res) / res, Math.round((y - RUN_ORIGIN[1]) * res) / res, FRAME.width / FRAME.scale, FRAME.height / FRAME.scale)
     ctx.restore()
   }
 

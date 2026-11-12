@@ -7,7 +7,7 @@ import { PixelBuffer, pack, mix, hash, dither } from './pixels.js'
 import { drawText, outlined } from './sprites.js'
 import { artSize, artColors, drawArt, drawBig, bigW, drawKanji } from './art.js'
 
-const ADS = [
+export const ADS = [
   { brand: 'NEON COLA', tag: 'STAY AWAKE', art: 'can' },
   { brand: 'RAMEN 24', tag: 'HOT NOW', art: 'bowl' },
   { brand: 'HELIX', tag: 'SEE MORE', art: 'face' },

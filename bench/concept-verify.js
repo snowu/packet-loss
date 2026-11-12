@@ -32,7 +32,7 @@ try {
       for (const state of states) {
       v.ctx.clearRect(0, 0, v.W, v.logicalH)
       v.drawActor({ state, speed: 12, vy: 3, t: 0.2 }, 100, 150, 1)
-      const pixels = v.ctx.getImageData(100, 180, 200, 150).data
+      const pixels = v.ctx.getImageData(50 * v.res, 90 * v.res, 100 * v.res, 75 * v.res).data
       let n = 0
       for (let i = 0; i < pixels.length; i += 4) if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 20) n++
       if (n < 30) throw new Error(`Missing production pose: ${state}`)
@@ -53,7 +53,7 @@ try {
       for (let i = 0; i < 900; i++) { window.__tick(); if (i % 120 === 0) await window.__yield() }
       runs.push({ mode, distance: G.g.player.x, materials: v.materials.size, kit: v.kitCache.size })
     }
-    return { poses: poses.size, runs, doubled: v.canvas.width === v.W * 2 && v.canvas.height === v.logicalH * 2, backgrounds: v.backgrounds.size }
+    return { poses: poses.size, runs, doubled: v.res >= 2 && v.res <= 3 && v.canvas.width === v.W * v.res && v.canvas.height === v.logicalH * v.res, backgrounds: v.backgrounds.size }
   })
   assert.equal(result.poses, 39); assert.ok(result.doubled)
   for (const run of result.runs) { assert.ok(run.distance > 70); assert.ok(run.materials < 12); assert.ok(run.kit <= 96) }

@@ -11,8 +11,17 @@ const wrapPi = a => a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
 
 // Blend-in time for each clip, seconds. Short where the simulation changes
 // state on an impact, longer where the body has time to settle.
-const BLEND = { run: 0.1, idle: 0.3, brace: 0.12, air: 0.1, slide: 0.08, vault: 0.08, mantle: 0.08, climb: 0.1, wallslide: 0.12, wallrun: 0.1, zip: 0.12, roll: 0.06, stumble: 0.08, dead: 0.15 }
+const BLEND = { run: 0.1, idle: 0.3, brace: 0.12, air: 0.1, slide: 0.08, vault: 0.1, mantle: 0.08, climb: 0.1, wallslide: 0.12, wallrun: 0.1, zip: 0.12, roll: 0.06, stumble: 0.08, dead: 0.15 }
 const GROUNDED = new Set(['run', 'idle', 'brace'])
+
+// Follow-through. These channels do not track the pose directly: each chases
+// it on a damped spring, so the chest, head and hands arrive a beat late and
+// overshoot a little whenever the body changes what it is doing. [stiffness,
+// damping]; lower stiffness trails more.
+const FOLLOW = { chest: [260, 17], head: [200, 15], nWrist: [230, 13], fWrist: [230, 13], nElbow: [520, 30], fElbow: [520, 30] }
+// How far body acceleration (m/s^2) tips the torso: forward when speeding
+// up, back when braking.
+const SURGE = 0.006
 
 // Hair: segment lengths (model units) from the tie to the tip.
 export const HAIR_SEGMENTS = Object.freeze([1.6, 1.5, 1.4, 1.25, 1.05])
@@ -73,7 +82,8 @@ export class Animator {
   reset() {
     this.clip = null; this.from = null; this.blendT = 1; this.blendDur = 0
     this.time = 0; this.landT = 1; this.landAmp = 0; this.airVy = 0; this.state = null
-    this.pos = null; this.motion = [0, 0]
+    this.pos = null; this.motion = [0, 0]; this.surge = 0
+    this.follow = null
     this.target = pose(); this.out = pose()
     this.hair.reset()
   }
@@ -119,6 +129,7 @@ export class Animator {
     } else Object.assign(this.out, target)
     if (!this.blendDur || this.blendT >= this.blendDur) this.out.spin = wrapPi(this.out.spin)
 
+    this.secondary(dt)
     this.joints = solve(this.out)
     // Each clip stands on the roof, but a pose halfway between two of them
     // may not: ease it out as the blend proceeds rather than let a foot dip
@@ -133,12 +144,29 @@ export class Animator {
     return this.out
   }
 
+  secondary(dt) {
+    const out = this.out
+    if (!this.follow) { this.follow = Object.fromEntries(Object.keys(FOLLOW).map(k => [k, [out[k], 0]])); return }
+    out.lean += this.surge
+    const steps = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / steps
+    for (const k in FOLLOW) {
+      const f = this.follow[k], [stiff, damp] = FOLLOW[k]
+      for (let i = 0; i < steps && h > 0; i++) { f[1] += (stiff * (out[k] - f[0]) - damp * f[1]) * h; f[0] += f[1] * h }
+      // Stay within reach of the pose, so a long stall cannot leave it adrift.
+      f[0] = clamp(f[0], out[k] - 0.6, out[k] + 0.6)
+      out[k] = f[0]
+    }
+  }
+
   trackMotion(dt, x, y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
     if (!this.pos || !(dt > 0)) { if (!this.pos) this.pos = [x, y]; return }
     const vx = (x - this.pos[0]) / dt, vy = (y - this.pos[1]) / dt
     this.pos = [x, y]
     if (Math.hypot(vx, vy) > 80) return
     const k = 1 - Math.exp(-dt * 12)
+    const ax = clamp((vx - this.motion[0]) * 12, -40, 40)
+    this.surge += (clamp(ax * SURGE, -0.12, 0.12) - this.surge) * (1 - Math.exp(-dt * 9))
     // World y is up; motion is kept in m/s with y up.
     this.motion = [this.motion[0] + (vx - this.motion[0]) * k, this.motion[1] + (vy - this.motion[1]) * k]
   }
