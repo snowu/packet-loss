@@ -29,9 +29,12 @@ try {
     const poses = new Set()
     for (const outfit of ['courier', 'windbreaker', 'techwear']) {
       v.setRunner(outfit)
-      for (const state of states) {
+      for (const state of states) for (const t of [0.05, 0.2, 0.45, 0.7]) {
       v.ctx.clearRect(0, 0, v.W, v.logicalH)
-      v.drawActor({ state, speed: 12, vy: 3, t: 0.2 }, 100, 150, 1)
+      // Settle into the move, so the frame is the pose and not a blend into it.
+      const p = { state, speed: 12, vy: 3 - t * 20, t, kin: { t: Math.min(t, 0.3), T: 0.3 } }
+      for (let i = 0; i < 12; i++) v.rig.update(p, 100 + t + i / 60, t * 3, false, i * 0.2, 0)
+      v.drawActor(p, 100, 150, 100 + t + 0.2)
       const pixels = v.ctx.getImageData(50 * v.res, 90 * v.res, 100 * v.res, 75 * v.res).data
       let n = 0
       for (let i = 0; i < pixels.length; i += 4) if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 20) n++
@@ -39,7 +42,7 @@ try {
       // The painted sprite must fit its frame: nothing opaque on the border.
       const im = v.rig.image(), edge = im.getContext('2d').getImageData(0, 0, im.width, im.height).data
       for (let y = 0; y < im.height; y++) for (let x = 0; x < im.width; x += (y && y < im.height - 1 ? im.width - 1 : 1)) {
-        if (edge[(y * im.width + x) * 4 + 3]) throw new Error(`${outfit} ${state} clips the sprite edge at ${x},${y}`)
+        if (edge[(y * im.width + x) * 4 + 3]) throw new Error(`${outfit} ${state} at ${t}s clips the sprite edge at ${x},${y}`)
       }
       poses.add(`${outfit}:${state}`)
       }

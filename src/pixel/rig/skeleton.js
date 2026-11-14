@@ -7,7 +7,7 @@
 import { MODEL, SHOE } from '../runnerModel.js'
 
 export const BONES = Object.freeze({
-  abdomen: 4.3, chest: MODEL.torso - 4.3, neck: 1.5,
+  abdomen: 5.0, chest: MODEL.torso - 5.0, neck: 1.5,
   thigh: MODEL.thigh, shin: MODEL.shin,
   upper: MODEL.upper, fore: MODEL.fore, hand: MODEL.hand,
 })
@@ -16,14 +16,16 @@ export const BONES = Object.freeze({
 // channel. Angles are radians. `x`/`y` place the pelvis; `spin` turns the
 // whole body about its middle (rolls). Knee and elbow flex are clamped to
 // their anatomical range when solved, so no blend can hyperextend a joint.
+// `twist` turns the ribcage against the pelvis about the spine: seen from the
+// side, the near shoulder comes forward as the near hip goes back.
 export const CHANNELS = Object.freeze([
-  'x', 'y', 'spin', 'lean', 'chest', 'head',
+  'x', 'y', 'spin', 'lean', 'chest', 'twist', 'head',
   'nThigh', 'nKnee', 'nFoot', 'fThigh', 'fKnee', 'fFoot',
   'nArm', 'nElbow', 'nWrist', 'fArm', 'fElbow', 'fWrist',
 ])
 
 export const NEUTRAL = Object.freeze({
-  x: 0, y: -MODEL.hip, spin: 0, lean: 0.04, chest: 0, head: 0,
+  x: 0, y: -MODEL.hip, spin: 0, lean: 0.04, chest: 0, twist: 0, head: 0,
   nThigh: 0.05, nKnee: 0.1, nFoot: 0, fThigh: -0.05, fKnee: 0.1, fFoot: 0,
   nArm: 0.05, nElbow: 0.3, nWrist: 0.1, fArm: -0.05, fElbow: 0.3, fWrist: 0.1,
 })
@@ -70,19 +72,32 @@ function arm(shoulder, angle, elbow, wrist) {
   return { shoulder, elbow: e, wrist: w, knuckles: add(w, dir(hand), BONES.hand), hand }
 }
 
+// Half the width of the shoulders and of the hips as a full twist shows
+// them from the side, in model units.
+const SHOULDER_SPAN = 1.7, HIP_SPAN = 1.0
+
+// Where the two hip joints are: either side of the pelvis centre along its
+// forward axis, by how far the body is twisted.
+export function hipsOf(p) {
+  const f = [Math.cos(p.lean), Math.sin(p.lean)], d = (p.twist || 0) * HIP_SPAN
+  return [[p.x - f[0] * d, p.y - f[1] * d], [p.x + f[0] * d, p.y + f[1] * d]]
+}
+
 // Forward kinematics: joint positions for a pose, before any `spin`.
 function chain(p) {
-  const hip = [p.x, p.y]
+  const hip = [p.x, p.y], twist = p.twist || 0
   const pelvis = frame(hip, p.lean)
   const waist = at(pelvis, 0, BONES.abdomen)
   const chest = frame(waist, p.lean + p.chest)
   const shoulder = at(chest, -0.3, BONES.chest - 0.6)
   const neck = at(chest, 0.5, BONES.chest)
   const head = frame(add(neck, up(p.lean + p.chest + (p.head - p.lean - p.chest) * 0.5), BONES.neck), p.head)
+  const [nearHip, farHip] = hipsOf(p)
   return {
     hip, waist, pelvis, chest, shoulder, neck, head,
-    near: leg(hip, p.nThigh, p.nKnee, p.nFoot), far: leg(hip, p.fThigh, p.fKnee, p.fFoot),
-    nearArm: arm(shoulder, p.nArm, p.nElbow, p.nWrist), farArm: arm(shoulder, p.fArm, p.fElbow, p.fWrist),
+    near: leg(nearHip, p.nThigh, p.nKnee, p.nFoot), far: leg(farHip, p.fThigh, p.fKnee, p.fFoot),
+    nearArm: arm(at(chest, -0.3 + twist * SHOULDER_SPAN, BONES.chest - 0.6), p.nArm, p.nElbow, p.nWrist),
+    farArm: arm(at(chest, -0.3 - twist * SHOULDER_SPAN, BONES.chest - 0.6), p.fArm, p.fElbow, p.fWrist),
   }
 }
 
@@ -135,6 +150,13 @@ export function bottomOf(j) {
     j.hip[1] + 2.4, j.waist[1] + 2.2, j.shoulder[1] + 2.2, at(j.head, 0, 3.5)[1] + 3.5)
 }
 
+// Highest visible point of a solved pose (y is down, so the smallest): the
+// crown and the back of the hair, the fists, knees and shoulders.
+export function topOf(j) {
+  return Math.min(at(j.head, 0.4, MODEL.head * 0.86)[1], at(j.head, -2.6, MODEL.head * 0.7)[1],
+    j.nearArm.knuckles[1] - 1.2, j.farArm.knuckles[1] - 1.2, j.near.knee[1] - 2.4, j.far.knee[1] - 2.4, j.shoulder[1] - 2.2)
+}
+
 // Lift or drop the pose so its lowest point rests on the roof.
 export function ground(p) {
   return { ...p, y: p.y - bottomOf(solve(p)) }
@@ -162,7 +184,8 @@ export function legAngles(hip, ankle) {
 // applied to any grounded pose without sliding its soles.
 export function crouch(p, amount) {
   if (!(amount > 0)) return p
-  const j = chain(p), hip = [p.x, p.y + amount]
-  const n = legAngles(hip, j.near.ankle), f = legAngles(hip, j.far.ankle)
-  return { ...p, y: hip[1], nThigh: n.thigh, nKnee: n.knee, fThigh: f.thigh, fKnee: f.knee, lean: p.lean + amount * 0.05 }
+  const j = chain(p), q = { ...p, y: p.y + amount, lean: p.lean + amount * 0.05 }
+  const [nearHip, farHip] = hipsOf(q)
+  const n = legAngles(nearHip, j.near.ankle), f = legAngles(farHip, j.far.ankle)
+  return { ...q, nThigh: n.thigh, nKnee: n.knee, fThigh: f.thigh, fKnee: f.knee }
 }

@@ -8,6 +8,8 @@ proportions or animation.
 
 ![Runner rig model sheet](screenshots/runner-rig/model-sheet.png)
 
+![Build and poses, before and after](screenshots/runner-rig/build-before-after.png)
+
 ![Every move, with crossfades](screenshots/runner-rig/moves.png)
 
 ![Run cycle, all outfits](screenshots/runner-rig/run-cycle.png)
@@ -27,7 +29,17 @@ proportions or animation.
 **Skeleton.** Bone lengths come from `runnerModel.js` and never change.
 A pose is a flat record of angles (`lean`, `nThigh`, `nKnee`, `fArm`, …),
 so any two poses blend channel by channel. Knee and elbow flex are clamped
-when solved, so no blend can bend a joint backwards.
+when solved, so no blend can bend a joint backwards. `twist` turns the
+ribcage against the pelvis: from the side, the near shoulder comes forward
+as the near hip goes back. Each arm hangs from its own shoulder and each leg
+from its own hip joint, so a twisted body shows it.
+
+**Proportions.** About six and a half heads tall, the hip joint just over
+half way up, a torso longer than a thigh, and hands that reach mid-thigh.
+The painted parts are the same; only the lengths and girths they are bound
+at changed. The sprite is drawn larger than the collision box (about 41 px
+against 25), as it has been since the painted runner, so obstacles are low
+against her: a slide pipe is at knee height. That scale is not changed here.
 
 **Animation.** Each move is a short clip of key poses sampled with a
 Catmull-Rom spline, so motion carries its speed through each key instead of
@@ -52,16 +64,28 @@ they arrive a beat late and overshoot a little whenever the body changes
 what it is doing. The torso also tips with acceleration, forward when
 speeding up and back when braking. In the run the ribcage twists against the
 hips, the chest gives with each footfall, and the forearm whips through the
-swing; in the air the legs keep working and the arms feel for balance.
+swing; in the air the legs keep working and the arms feel for balance. In
+the run the shoulders turn with the arms and the hips against them once a
+stride, and the legs are solved from the turned hip joints so planted soles
+still do not slide.
 
 **Drawing.** Each outfit is a transparent 3×3 sheet of nine parts, in
 reading order: head, torso, ponytail; upper arm, forearm, fist; thigh, shin,
 shoe. `parts.js` binds each part to its bone at fixed landmarks (`BIND`),
 measures the part's real opaque width across the bone, and bakes it once to
 working resolution with stepwise filtering. Per frame a part is only rotated
-about its joint. The sprite is drawn at twice the screen's resolution and
-averaged down onto whole device pixels, which is what keeps the painted
-detail clean at game size. Far limbs are darkened copies.
+about its joint. The torso is the exception: it is laid in three bands along
+the spine (`spine` in `parts.js`), so `chest` bends her at the waist instead
+of tipping a stiff block. The sprite is drawn at twice the screen's
+resolution and averaged down onto whole device pixels, which is what keeps
+the painted detail clean at game size. Far limbs are darkened copies.
+
+**Outline.** `RunnerRig.setOutline('light' | 'dark' | null)` puts a thin
+outline round the dark parts of the outfit (trousers, top, sleeves), from
+copies of those parts grown by half a pixel and filled with one colour when
+the kit is built. It costs eleven small draws a frame and is dropped at reduced quality levels. A blurred glow, or an
+outline composited from the finished sprite each frame, cost three to four
+times as much in the benchmark and were dropped.
 
 **Build.** `GIRTH` in `runnerModel.js` is the thickness of each part across
 its bone and `TAPER` varies it along the bone (full hips and thighs narrowing
@@ -133,7 +157,9 @@ node bench/gait-review.js      # footstep audio vs rendered contacts in the real
 node bench/concept-verify.js   # every state and outfit, all modes, cache bounds
 ```
 
-Unit tests (`tests/runnerRig.test.js`) cover fixed bone lengths through
+Unit tests (`tests/runnerRig.test.js`) cover the build's proportions, the
+slide fitting under the lowest pipe, every move staying inside the sprite
+frame, shoulders turning against hips, fixed bone lengths through
 every move and mid-blend, knees and elbows never hyperextending, run soles
 planted and moving with the roof, grounded poses on the roof, transitions
 between every pair of states without a pop, one turn per roll with no

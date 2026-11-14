@@ -42,6 +42,8 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/node_modules" ../art-base/node_modules
           node bench/art-review.js --root=../art-base --tag=before
           node bench/art-review.js --tag=after
+          node bench/course-review.js --root=../art-base --tag=before --out=docs/screenshots/course-review
+          node bench/course-review.js --tag=after --out=docs/screenshots/course-review
       - uses: actions/upload-artifact@v4
         with:
           name: art-review
@@ -50,6 +52,7 @@ jobs:
             docs/screenshots/concept/*.png
             docs/screenshots/gait/*.png
             docs/screenshots/runner-rig/*
+            docs/screenshots/course-review/*.png
   bench:
     runs-on: ubuntu-24.04
     steps:

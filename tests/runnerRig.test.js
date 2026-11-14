@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BONES, solve, soleBottom, bottomOf, CHANNELS } from '../src/pixel/rig/skeleton.js'
+import { BONES, solve, soleBottom, bottomOf, topOf, at, pose, CHANNELS } from '../src/pixel/rig/skeleton.js'
 import { runChannels, sampleState, CLIPS } from '../src/pixel/rig/clips.js'
 import { Animator } from '../src/pixel/rig/animator.js'
 import { SKINS, defineSkin, rulesFor, recolorPixels } from '../src/pixel/rig/skins.js'
@@ -7,7 +7,8 @@ import { atlasCell } from '../src/pixel/conceptArt.js'
 import { decodePng } from '../scripts/png.mjs'
 import { readFileSync } from 'node:fs'
 import { STANCE, RUN_STRIDE, CONTACT_X } from '../src/pixel/runGait.js'
-import { SHOE, PART } from '../src/pixel/runnerModel.js'
+import { SHOE, PART, MODEL, FRAME } from '../src/pixel/runnerModel.js'
+import { PHYS } from '../src/sim/config.js'
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
@@ -82,6 +83,53 @@ describe('runner skeleton', () => {
       }
     }
     expect(Object.keys(CLIPS)).toEqual(expect.arrayContaining(['idle', 'air', 'slide', 'vault', 'mantle', 'climb', 'wallslide', 'zip', 'roll', 'stumble']))
+  })
+})
+
+describe('runner build', () => {
+  it('has the proportions of an athletic adult', () => {
+    const j = solve(pose({ lean: 0, chest: 0, head: 0, nThigh: 0, nKnee: 0, fThigh: 0, fKnee: 0, nArm: 0, nElbow: 0, nWrist: 0 }))
+    const crown = -topOf(j), hip = MODEL.thigh + MODEL.shin + SHOE.y + SHOE.h
+    // Six to seven and a half heads tall (the painted head, hair included),
+    // hips just over half way up.
+    expect(crown / MODEL.head).toBeGreaterThan(6); expect(crown / MODEL.head).toBeLessThan(7.5)
+    expect(hip / crown).toBeGreaterThan(0.5); expect(hip / crown).toBeLessThan(0.58)
+    // The torso is longer than a thigh, and a hanging hand reaches mid-thigh.
+    expect(MODEL.torso).toBeGreaterThan(MODEL.thigh)
+    const reach = j.nearArm.knuckles[1] - j.near.hip[1]
+    expect(reach).toBeGreaterThan(MODEL.thigh * 0.25); expect(reach).toBeLessThan(MODEL.thigh * 0.75)
+  })
+
+  it('turns the shoulders against the hips without moving a planted foot', () => {
+    const flat = solve(pose({ twist: 0 })), turned = solve(pose({ twist: 1 }))
+    expect(turned.nearArm.shoulder[0]).toBeGreaterThan(flat.nearArm.shoulder[0] + 1)
+    expect(turned.farArm.shoulder[0]).toBeLessThan(flat.farArm.shoulder[0] - 1)
+    expect(turned.near.hip[0]).toBeLessThan(flat.near.hip[0] - 0.5)
+    expect(turned.far.hip[0]).toBeGreaterThan(flat.far.hip[0] + 0.5)
+    // The run turns them once a stride, each way.
+    const twists = Array.from({ length: 40 }, (_, i) => runChannels(i / 40, 0.6).twist)
+    expect(Math.max(...twists)).toBeGreaterThan(0.5); expect(Math.min(...twists)).toBeLessThan(-0.5)
+  })
+
+  it('slides under the lowest pipe the generator lays', () => {
+    // Pipes hang at least 1.0 m over the roof; the slide has settled by the
+    // time the body reaches one.
+    for (const t of [0.16, 0.3, 0.45, 0.6, PHYS.SLIDE_TIME]) for (const time of [0, 0.05, 0.11]) {
+      const j = solve(sampleState('slide', { state: 'slide', t }, { phase: 0, time }))
+      expect(-topOf(j), `slide ${t}`).toBeLessThan(1.0 * 14)
+    }
+  })
+
+  it('keeps every move inside the sprite frame', () => {
+    const [ox, oy] = FRAME.origin, w = FRAME.width / FRAME.scale, h = FRAME.height / FRAME.scale
+    for (const s of STATES) for (const frames of [3, 12, 40]) {
+      const a = settle(s, frames), j = a.joints
+      const pts = [j.near.ankle, j.far.ankle, j.near.knee, j.far.knee, j.nearArm.knuckles, j.farArm.knuckles, j.nearArm.elbow, j.farArm.elbow, at(j.head, 0.4, MODEL.head * 0.86), at(j.head, 3, 2), ...a.hairPoints]
+      for (const p of pts) {
+        expect(p[0], s.name).toBeGreaterThan(-ox + 3); expect(p[0], s.name).toBeLessThan(w - ox - 3)
+        expect(p[1], s.name).toBeGreaterThan(-oy + 3); expect(p[1], s.name).toBeLessThan(h - oy - 3)
+      }
+    }
   })
 })
 

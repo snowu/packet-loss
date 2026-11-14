@@ -11,7 +11,7 @@ const wrapPi = a => a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
 
 // Blend-in time for each clip, seconds. Short where the simulation changes
 // state on an impact, longer where the body has time to settle.
-const BLEND = { run: 0.1, idle: 0.3, brace: 0.12, air: 0.1, slide: 0.08, vault: 0.1, mantle: 0.08, climb: 0.1, wallslide: 0.12, wallrun: 0.1, zip: 0.12, roll: 0.06, stumble: 0.08, dead: 0.15 }
+const BLEND = { run: 0.1, idle: 0.3, brace: 0.12, air: 0.1, slide: 0.1, vault: 0.1, mantle: 0.1, climb: 0.1, wallslide: 0.12, wallrun: 0.1, zip: 0.12, roll: 0.06, stumble: 0.11, dead: 0.15 }
 const GROUNDED = new Set(['run', 'idle', 'brace'])
 
 // Follow-through. These channels do not track the pose directly: each chases
@@ -24,8 +24,8 @@ const FOLLOW = { chest: [260, 17], head: [200, 15], nWrist: [230, 13], fWrist: [
 const SURGE = 0.006
 
 // Hair: segment lengths (model units) from the tie to the tip.
-export const HAIR_SEGMENTS = Object.freeze([1.6, 1.5, 1.4, 1.25, 1.05])
-export const HAIR_TIE = Object.freeze([-1.6, 4.2]) // head frame: back, up
+export const HAIR_SEGMENTS = Object.freeze([1.45, 1.35, 1.25, 1.1, 0.95])
+export const HAIR_TIE = Object.freeze([-1.45, 3.8]) // head frame: back, up
 
 export class Hair {
   constructor() { this.reset() }

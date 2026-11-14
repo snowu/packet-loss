@@ -21,6 +21,7 @@ export class RunnerRig {
     this.canvas = document.createElement('canvas')
     this.canvas.width = FRAME.width / FRAME.scale * SS; this.canvas.height = FRAME.height / FRAME.scale * SS
     this.ctx = this.canvas.getContext('2d')
+    this.outline = null
     this.setSkin(skin)
   }
 
@@ -30,6 +31,14 @@ export class RunnerRig {
   }
 
   reset() { this.animator.reset(); this.last = undefined }
+
+  // Outline the pose: 'light' against a dark city, 'dark' against a bright
+  // one, null for none. It is what keeps a dark figure apart from a dark
+  // picture, and it is drawn from sprites baked with the kit, so it costs a
+  // few small draws and no per-frame compositing.
+  setOutline(tone) {
+    if (tone !== this.outline) { this.outline = tone; this.dirty = true }
+  }
 
   // Advance to `time` (seconds on the caller's clock) and return the pose.
   update(p, time, phase, idle, x, y) {
@@ -46,8 +55,9 @@ export class RunnerRig {
     if (!this.dirty) return this.canvas
     const ctx = this.ctx
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
-    drawRunner(ctx, this.animator.joints, this.animator.hairPoints, kitFor(this.skin), FRAME.origin)
+    drawRunner(ctx, this.animator.joints, this.animator.hairPoints, kitFor(this.skin), FRAME.origin, this.outline)
     this.dirty = false
     return this.canvas
   }
+
 }
