@@ -98,6 +98,20 @@ function shaded(sprite) {
   return { ...sprite, cv }
 }
 
+// Outline colours: a cool light against a night city, near-black against a
+// bright one. OUTLINE is how far the outline stands off the part, in sprite
+// pixels (SS per logical pixel).
+export const OUTLINES = Object.freeze({ light: '#cfe4ff78', dark: '#0b0814b8' })
+const OUTLINE = 2
+
+// The same sprite grown by OUTLINE all round and filled with one colour.
+function outlined(sprite, color) {
+  const d = OUTLINE, cv = canvas(sprite.cv.width + d * 2, sprite.cv.height + d * 2), c = cv.getContext('2d')
+  for (const [x, y] of [[0, d], [d * 2, d], [d, 0], [d, d * 2], [d * 0.3, d * 0.3], [d * 1.7, d * 0.3], [d * 0.3, d * 1.7], [d * 1.7, d * 1.7]]) c.drawImage(sprite.cv, x, y)
+  c.globalCompositeOperation = 'source-in'; c.fillStyle = color; c.fillRect(0, 0, cv.width, cv.height)
+  return { cv, x: sprite.x + d, y: sprite.y + d }
+}
+
 // Build an outfit's drawable kit from its nine trimmed part images.
 export function buildKit(images, skin) {
   const part = name => recoloured(images[PART[name]], rulesFor(skin, name))
@@ -118,7 +132,8 @@ export function buildKit(images, skin) {
   const hairScale = HAIR_SEGMENTS.reduce((s, l) => s + l, 0) * SS / Math.hypot(tip[0] - tie[0], tip[1] - tie[1])
   near.hair = bake(hair, tie, Math.atan2(tip[1] - tie[1], tip[0] - tie[0]), hairScale, hairScale)
   const far = Object.fromEntries(['upper', 'fore', 'hand', 'thigh', 'shin', 'shoe'].map(name => [name, shaded(near[name])]))
-  return { near, far }
+  const outline = Object.fromEntries(Object.entries(OUTLINES).map(([tone, color]) => [tone, Object.fromEntries(['torso', 'upper', 'fore', 'thigh', 'shin'].map(name => [name, outlined(near[name], color)]))]))
+  return { near, far, outline }
 }
 
 // Sprites are baked at SS pixels per unit, so placing one is a rotation
@@ -142,29 +157,56 @@ function arm(ctx, o, kit, a) {
   place(ctx, o, kit.hand, a.wrist, along(a.wrist, a.knuckles))
 }
 
-// The ponytail sprite, straightened at bake time, is laid along the spring
-// chain one band per segment, so it bends and whips with the hair physics.
-function ponytail(ctx, o, sprite, points) {
+// Lay a sprite that was baked straight along a chain of points, one band per
+// segment, so it bends where the chain bends. `lengths` are the segments'
+// lengths in the sprite (model units); a band is stretched along the chain if
+// its two points are further apart than that. Bands overlap by a pixel, which
+// covers the wedge a bend opens on its outer side.
+function bent(ctx, o, sprite, points, lengths) {
   let start = 0
-  for (let i = 0; i < HAIR_SEGMENTS.length; i++) {
-    const length = HAIR_SEGMENTS[i] * SS, last = i === HAIR_SEGMENTS.length - 1
+  for (let i = 0; i < lengths.length; i++) {
+    const length = lengths[i] * SS, last = i === lengths.length - 1
     const x0 = i ? sprite.x + start - 1 : 0, x1 = last ? sprite.cv.width : sprite.x + start + length + 1
-    const angle = along(points[i], points[i + 1]), cos = Math.cos(angle), sin = Math.sin(angle)
-    ctx.setTransform(cos, sin, -sin, cos, (points[i][0] + o[0]) * SS, (points[i][1] + o[1]) * SS)
+    const a = points[i], b = points[i + 1], angle = along(a, b), cos = Math.cos(angle), sin = Math.sin(angle)
+    const stretch = Math.hypot(b[0] - a[0], b[1] - a[1]) * SS / length
+    ctx.setTransform(cos * stretch, sin * stretch, -sin, cos, (a[0] + o[0]) * SS, (a[1] + o[1]) * SS)
     ctx.drawImage(sprite.cv, x0, 0, x1 - x0, sprite.cv.height, x0 - sprite.x - start, -sprite.y, x1 - x0, sprite.cv.height)
     start += length
   }
 }
 
+// The spine as the torso is drawn along it: from the hips through the waist
+// to the top of the chest, rounded so the back curves instead of folding.
+const SPINE_BANDS = 3
+const SPINE_LENGTHS = Array.from({ length: SPINE_BANDS }, () => MODEL.torso / SPINE_BANDS)
+export function spine(j) {
+  const a = j.hip, c = j.waist, b = at(j.chest, 0, BONES.chest), pts = []
+  for (let i = 0; i <= SPINE_BANDS; i++) {
+    // A curve from hip to chest that is pulled half way toward the waist.
+    const t = i / SPINE_BANDS, u = 1 - t, k = 2 * u * t
+    const mid = [(a[0] + b[0]) / 2 * 0.5 + c[0] * 0.5, (a[1] + b[1]) / 2 * 0.5 + c[1] * 0.5]
+    pts.push([u * u * a[0] + k * mid[0] + t * t * b[0], u * u * a[1] + k * mid[1] + t * t * b[1]])
+  }
+  return pts
+}
+
 // Draw a solved pose onto a canvas of SS pixels per model unit, with the
-// roof contact at `origin` (model units). Leaves the transform reset.
-export function drawRunner(ctx, j, hair, kit, origin) {
-  const { near, far } = kit, o = origin
+// roof contact at `origin` (model units). `outline` ('light' or 'dark') puts
+// an outline round the whole figure first. Leaves the transform reset.
+export function drawRunner(ctx, j, hair, kit, origin, outline = null) {
+  const { near, far } = kit, o = origin, edge = outline && kit.outline[outline]
+  const spinePoints = spine(j), neck = at(j.head, ...NECK_AT)
+  if (edge) {
+    // Only what is dark enough to be lost: trousers, top and sleeves. Skin,
+    // hair, gloves and shoes hold their own against the city.
+    for (const a of [j.farArm, j.nearArm]) { place(ctx, o, edge.upper, a.shoulder, along(a.shoulder, a.elbow)); place(ctx, o, edge.fore, a.elbow, along(a.elbow, a.wrist)) }
+    for (const l of [j.far, j.near]) { place(ctx, o, edge.thigh, l.hip, along(l.hip, l.knee)); place(ctx, o, edge.shin, l.knee, along(l.knee, l.ankle)) }
+    bent(ctx, o, edge.torso, spinePoints, SPINE_LENGTHS)
+  }
   arm(ctx, o, far, j.farArm); leg(ctx, o, far, j.far); leg(ctx, o, near, j.near)
-  const top = at(j.chest, 0, BONES.chest)
-  place(ctx, o, near.torso, j.hip, along(j.hip, top), Math.hypot(top[0] - j.hip[0], top[1] - j.hip[1]) / MODEL.torso)
-  ponytail(ctx, o, near.hair, hair)
-  place(ctx, o, near.head, at(j.head, ...NECK_AT), j.head.angle)
+  bent(ctx, o, near.torso, spinePoints, SPINE_LENGTHS)
+  bent(ctx, o, near.hair, hair, HAIR_SEGMENTS)
+  place(ctx, o, near.head, neck, j.head.angle)
   arm(ctx, o, near, j.nearArm)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 }

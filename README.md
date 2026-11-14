@@ -93,7 +93,7 @@ npm run dev
 ## Movement
 
 - **Vault**: press jump as you reach anything waist-high and you speed-vault it. Run into it without pressing and you trip, losing speed and your combo. Taller crates stop you dead until you climb them.
-- **Slide**: duck under red-striped pipes. Running into one standing up makes you stumble.
+- **Slide**: duck under the red-and-white striped pipes. Running into one standing up makes you stumble.
 - **Roll**: big drops cause a hard landing that kills your speed unless you press slide just before you land.
 - **Landing slide**: on a normal landing, press slide right as your feet touch down (within a few hundredths of a second either side) to land straight into a slide with a speed boost and a combo move. Jump out of it as a slide jump and land into another to keep a chain going. It only boosts when you're fast (about 46 km/h and up with perfect timing) and the cleaner the timing the bigger the boost; otherwise it's a plain slide, which keeps your speed. While you fall, brackets close in on your landing spot and a diamond lights up inside the timing window (cyan for a landing slide, red when the landing will be hard and you should roll); a label tells you how it went: PERFECT, GREAT, GOOD, or EARLY, LATE, TOO SLOW.
 - **Ledge grab / climb**: jump at walls to grab the edge, which keeps nearly all your speed. Jump into a wall too tall to grab and you climb it; that stops you, but you win most of your speed back within a couple of seconds.

@@ -30,10 +30,16 @@ changes from master.
 - Running phase follows distance travelled. Both feet alternate, planted feet
   track the roof, and each contact drives the footstep sound. Focus and pause
   use the same phase as the visible sprite. See [the gait fix](run-gait.md).
-- A 16-cell environment kit supplies the tank, AC, vent, ramen sign, drone,
-  crate, overhead pipe, springboard, duct, data shard, wall panel, cables and
-  facade materials. Procedural course geometry determines object placement and
-  size. Pipe barrels and wall-run panels align with their simulation regions.
+- A 16-cell environment kit supplies the scenery (tank, AC, vent, sign frame,
+  duct, cables), the drone, data shard, wall-run panel and facade materials.
+- Obstacles are not taken from the kit. The kit has one crate and one pipe;
+  stretched to every size the generator lays, they came out soft and looked
+  like the scenery behind them. `src/pixel/courseArt.js` draws each obstacle
+  for its own collision box, on a half-pixel grid, with one rule: a **red lid
+  on a flat top** is something to go over (crate: vault; locker: jump and
+  vault; machine room: climb), and a **red and white striped bar** is
+  something to go under (the slide pipe). Launch ramps and zipline masts are
+  drawn there too. See [obstacle clarity](#obstacle-clarity).
 - Background props are laid out per building by `src/pixel/roofDecor.js`:
   single props and small arrangements of tanks, air handlers, vents, ducts
   and junction boxes, in three sizes, mirrored and weathered, with uneven
@@ -60,6 +66,31 @@ Append `?art=legacy` (or `&art=legacy` to another query) for the original render
 If production images fail to load, the game automatically uses that renderer.
 The original F3 art lab still covers the legacy procedural assets. Production
 art is checked with the browser harness below and the production pose sheet.
+
+## Obstacle clarity
+
+![Pipes, before and after](screenshots/course-clarity/pipes.png)
+
+![Crate, locker and machine room, before and after](screenshots/course-clarity/blocks.png)
+
+What keeps the course apart from the roof it stands on:
+
+- **Scenery recedes.** Props behind the lane are veiled with the district's
+  haze (`RECEDE` in `conceptView.js`), and the painted duct and cable props
+  lose their red, so red only ever means "act on this".
+- **The lane is calm.** The skyline just above each roof washes toward the
+  haze, so lit windows do not compete with what is on the roof.
+- **Pipes are drawn over the runner.** A pipe stands on a leg at either side
+  of the lane; she slides under it and behind the near leg. The roof edge
+  under a pipe is dashed red.
+- **The runner is outlined** where she is dark (trousers, top, sleeves): light
+  at night, dark in Smog Noon. The outline is baked with the outfit's parts.
+- Obstacle art never reaches above its collision box, so what looks like it
+  can be cleared can be.
+
+`node bench/course-review.js` saves close-ups of each obstacle from the
+running game; run it on two checkouts (`--root`, `--tag`) for matching
+before/after frames.
 
 ## Verification
 

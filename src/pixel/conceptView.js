@@ -10,6 +10,7 @@ import { FocusFilter } from './focus.js'
 import { RunGait, RUN_STRIDE, STANCE } from './runGait.js'
 import { RunnerRig, RUN_ORIGIN } from './rig/index.js'
 import { FRAME } from './runnerModel.js'
+import { drawBlock, drawPipe, drawSpring, drawMast, BLEED } from './courseArt.js'
 
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt))
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -17,6 +18,23 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 // The sharpest the canvas gets, in backing pixels per logical pixel. Beyond
 // this the artwork has no more detail to show and every frame costs more.
 const MAX_RES = 3
+// How far scenery on the roof sinks into the haze behind the lane (0..1).
+const RECEDE = 0.4
+
+// A copy of a painted prop with its reds turned to the steel around them.
+function withoutRed(image) {
+  const cv = document.createElement('canvas'); cv.width = image.width; cv.height = image.height
+  const c = cv.getContext('2d', { willReadFrequently: true }); c.drawImage(image, 0, 0)
+  const data = c.getImageData(0, 0, cv.width, cv.height), d = data.data
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2]
+    if (r < 90 || r < g * 1.7 || r < b * 1.45) continue
+    const l = (r * 0.5 + g * 0.3 + b * 0.2) * 0.85
+    d[i] = l * 0.98; d[i + 1] = l * 0.86; d[i + 2] = l * 1.12
+  }
+  c.putImageData(data, 0, 0)
+  return cv
+}
 
 // Same world coordinates and collision geometry, twice the raster resolution.
 // The approved artwork is drawn directly, rather than traced into stick sprites.
@@ -46,6 +64,9 @@ export class ConceptView extends PixelView {
     this.plateArt = document.createElement('canvas'); this.plateArt.width = spring.width; this.plateArt.height = Math.round(spring.height * 0.55)
     this.plateArt.getContext('2d').drawImage(spring, 0, 0)
     this.decor = new WeakMap()
+    // Red is the colour of things the runner acts on. The painted duct and
+    // cable props wear it too, so their copies for the scenery lose it.
+    this.sceneryArt = new Map([KIT.duct, KIT.cables].map(id => [id, withoutRed(this.art.kit[id])]))
     document.body.classList.add('concept-art')
   }
 
@@ -129,6 +150,7 @@ export class ConceptView extends PixelView {
       this.updateCamera(s.raw, s)
       this.updateWeather(s.raw, pal)
     }
+    this.front = []
     this.drawBackdrop(pal)
     this.drawConceptCourse(s, pal)
     this.drawConceptSecurity(s)
@@ -139,6 +161,7 @@ export class ConceptView extends PixelView {
       ctx.restore()
     }
     if (!this.hide.runner) this.drawActor(s.p, this.sx(s.rx), this.sy(s.ry), this.cam.time, s.idle, false, this.gait.phase)
+    for (const [im, x, y] of this.front) ctx.drawImage(im, x, y, im.width / this.res, im.height / this.res)
     this.effects.update(s.dt, s.p, s.rx, s.ry)
     this.effects.draw(ctx, x => this.sx(x), y => this.sy(y))
     this.drawLandCue(s)
@@ -284,19 +307,43 @@ export class ConceptView extends PixelView {
     c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.drawImage(src, 0, 0, w, h)
   }
 
-  // shade: 0..2 weathers the prop a little darker; flip mirrors it.
-  kit(id, x, y, w, h, shade = 0, flip = false) {
+  // What scenery is veiled with so that it sits behind the lane: the
+  // district's own haze, darkened. Props keep their drawing and lose their
+  // contrast, which is what the eye uses to decide what is in front.
+  recede(pal) { return css(mix(pal.shadow, pal.haze, 0.62), RECEDE) }
+
+  // shade: 0..2 weathers the prop a little darker; flip mirrors it. With a
+  // palette the prop is scenery: it loses its red and recedes into the haze.
+  kit(id, x, y, w, h, shade = 0, flip = false, pal = null) {
     const n = typeof id === 'string' ? KIT[id] : id
     w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h))
-    const key = `${n ?? id}:${w}:${h}:${shade}:${this.res}`
+    const key = `${n ?? id}:${w}:${h}:${shade}:${this.res}:${pal ? pal.name : ''}`
     let im = this.kitCache.get(key)
     if (!im) {
       im = document.createElement('canvas'); im.width = w * this.res; im.height = h * this.res
-      const c = im.getContext('2d'); this.shrink(c, id === 'plate' ? this.plateArt : this.art.kit[n], im.width, im.height)
-      if (shade) { c.globalCompositeOperation = 'source-atop'; c.fillStyle = shade === 1 ? '#0a061838' : '#2a140a30'; c.fillRect(0, 0, im.width, im.height) }
+      const c = im.getContext('2d'); this.shrink(c, id === 'plate' ? this.plateArt : (pal && this.sceneryArt.get(n)) || this.art.kit[n], im.width, im.height)
+      c.globalCompositeOperation = 'source-atop'
+      if (shade) { c.fillStyle = shade === 1 ? '#0a061838' : '#2a140a30'; c.fillRect(0, 0, im.width, im.height) }
+      if (pal) { c.fillStyle = this.recede(pal); c.fillRect(0, 0, im.width, im.height) }
       this.cacheKit(key, im)
     }
     this.blit(im, x, y, w, h, flip)
+  }
+
+  // A vault crate, locker, machine room or slide pipe, drawn for its own
+  // collision box (see courseArt.js). Cached with BLEED pixels of margin.
+  obstacle(sd, w, h, drop = 0) {
+    const key = `course:${sd.kind}:${sd.sub}:${w}:${h}:${drop}:${sd.id & 15}:${this.res}`
+    let im = this.kitCache.get(key)
+    if (!im) {
+      im = document.createElement('canvas'); im.width = (w + BLEED * 2) * this.res; im.height = (h + drop + BLEED * 2) * this.res
+      const c = im.getContext('2d'); c.setTransform(this.res, 0, 0, this.res, BLEED * this.res, BLEED * this.res)
+      if (sd.kind === 'beam') drawPipe(c, w, h, drop, sd.id)
+      else if (sd.kind === 'spring') drawSpring(c, w, h, sd.id)
+      else drawBlock(c, sd.sub, w, h, sd.id)
+      this.cacheKit(key, im)
+    }
+    return im
   }
 
   blit(im, x, y, w, h, flip = false) {
@@ -380,6 +427,9 @@ export class ConceptView extends PixelView {
         this.kit('industrial', wx, wy, ww, Math.max(36, y - wy + 70))
       }
       for (const panel of c.wallruns) this.kit('wallrun', this.sx(panel.x0), this.sy(panel.y1), this.sx(panel.x1) - this.sx(panel.x0), this.sy(panel.y0) - this.sy(panel.y1))
+      // The skyline just above a roof washes toward the haze, so the band
+      // the runner moves through is the calmest part of the picture.
+      if (!this.hide.decor) ctx.drawImage(this.gradient(`lane:${pal.name}`, pal, 56, css(pal.haze, 0), css(mix(pal.haze, pal.shadow, 0.25), 0.5)), 0, 0, 1, 56, x, y - 13 - 56, w, 56)
       const facade = this.building(c, pal)
       ctx.drawImage(facade, x, y - 13, w, facade.height / this.res)
       if (!this.hide.decor) {
@@ -389,22 +439,24 @@ export class ConceptView extends PixelView {
           if (px + item.w < -4 || px > this.W + 4) continue
           ctx.fillStyle = '#09061180'; ctx.fillRect(px - 2, y - 14, item.w + 4, 3)
           if (item.id === 'sign') this.blit(this.billboard(item, pal), px, top, item.w, item.h)
-          else this.kit(item.id, px, top, item.w, item.h, item.shade, item.flip)
+          else this.kit(item.id, px, top, item.w, item.h, item.shade, item.flip, pal)
         }
       }
       if (this.hide.course) continue
       for (const sd of c.solids) {
         if (sd.kind === 'roof') continue
         const ox = this.sx(sd.x0), oy = this.sy(sd.y1), ow = Math.max(3, this.sx(sd.x1) - ox), oh = Math.max(3, this.sy(sd.y0) - oy)
-        ctx.fillStyle = '#090611a0'; ctx.fillRect(ox - 2, this.sy(sd.y0) - 1, ow + 4, 2)
-        if (sd.kind === 'beam') {
-          ctx.fillStyle = '#544a60'
-          for (const px of [ox + 2, ox + ow - 3]) ctx.fillRect(px, oy + oh, 2, Math.max(1, y - oy - oh))
-          const pipe = this.art.kit[KIT.pipe]
-          ctx.drawImage(pipe, 0, 0, pipe.width, Math.floor(pipe.height * 0.43), ox - 1, oy - 1, ow + 2, oh + 2)
-        }
-        else if (sd.kind === 'spring') this.kit('spring', ox - 2, oy - 3, ow + 4, oh + 3)
-        else this.kit('crate', ox, oy, ow, oh)
+        if (ox > this.W + 4 || ox + ow < -4) continue
+        // What it stands on is in shadow; under a pipe that shadow is the
+        // gap you slide through, so it is marked on the roof as well.
+        const drop = sd.kind === 'beam' ? Math.max(0, y - oy - oh) : 0
+        ctx.fillStyle = '#090611b0'; ctx.fillRect(ox - 2, y - 1, ow + 4, 2)
+        if (drop) { ctx.fillStyle = '#ea3340'; for (let px = ox - 3; px < ox + ow + 3; px += 4) ctx.fillRect(px, y + 1, 2, 1) }
+        const im = this.obstacle(sd, ow, oh, drop)
+        // A pipe crosses the lane on a stand at either side of it, so it is
+        // drawn over the runner: she goes under it and behind its near stand.
+        if (drop) this.front.push([im, ox - BLEED, oy - BLEED])
+        else ctx.drawImage(im, ox - BLEED, oy - BLEED, im.width / this.res, im.height / this.res)
       }
       for (const q of c.pads ?? []) {
         const qx = this.sx(q.x0), qw = this.sx(q.x1) - qx
@@ -413,11 +465,26 @@ export class ConceptView extends PixelView {
       for (const e of c.extras) if (e.type === 'ledge') { ctx.fillStyle = '#ff493d'; ctx.fillRect(this.sx(e.x), this.sy(e.y), 5, 2) }
       for (const f of c.fences ?? []) this.drawFence(f, this.cam.time, pal, 9)
       for (const z of c.ziplines) {
-        ctx.lineWidth = 1.5; ctx.strokeStyle = '#ff5147'; ctx.beginPath(); ctx.moveTo(this.sx(z.ax), this.sy(z.ay)); ctx.lineTo(this.sx(z.bx), this.sy(z.by)); ctx.stroke()
-        ctx.fillStyle = '#62556b'
-        ctx.fillRect(this.sx(z.ax) - 1, this.sy(z.ay), 2, Math.max(2, y - this.sy(z.ay)))
+        // A cable you can catch anywhere along it: red over a dark underside,
+        // so it holds against lit towers, from a mast with a red cap.
+        const ax = this.sx(z.ax), ay = this.sy(z.ay), bx = this.sx(z.bx), by = this.sy(z.by)
+        ctx.beginPath(); ctx.moveTo(ax, ay + 1); ctx.lineTo(bx, by + 1); ctx.lineWidth = 2; ctx.strokeStyle = '#2a0812'; ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineWidth = 1.5; ctx.strokeStyle = '#ff4a44'; ctx.stroke()
+        const mh = Math.max(4, y - ay)
+        ctx.drawImage(this.mast(mh), ax - 4, ay - 4, 8, mh + 6)
       }
     }
+  }
+
+  mast(h) {
+    const key = `mast:${h}:${this.res}`
+    let im = this.kitCache.get(key)
+    if (!im) {
+      im = document.createElement('canvas'); im.width = 8 * this.res; im.height = (h + 6) * this.res
+      const c = im.getContext('2d'); c.setTransform(this.res, 0, 0, this.res, 4 * this.res, 4 * this.res)
+      drawMast(c, h); this.cacheKit(key, im)
+    }
+    return im
   }
 
   drawConceptSecurity(s) {
@@ -465,8 +532,12 @@ export class ConceptView extends PixelView {
   }
 
   drawActor(p, x, y, time, idle = false, ghost = false, phase = (p.x ?? time * 12) / RUN_STRIDE) {
-    const rig = ghost ? this.ghostRig : this.rig, ctx = this.ctx
+    const rig = ghost ? this.ghostRig : this.rig, ctx = this.ctx, pal = this.pal
     rig.update(p, time, phase, idle, p.x ?? 0, p.y ?? 0)
+    // She is the darkest thing in a dark picture, so she carries her own
+    // separation: a thin outline, light at night and dark by day. It is the
+    // first thing to go when the quality governor steps down.
+    rig.setOutline(ghost || !pal || this.quality > 0 ? null : pal.night < 0.5 ? 'dark' : 'light')
     const im = rig.image()
     ctx.save()
     if (ghost) { ctx.globalAlpha *= 0.5; ctx.filter = 'grayscale(1) sepia(1) hue-rotate(125deg) saturate(4)' }

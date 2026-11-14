@@ -9,7 +9,7 @@ export const RUN_FRAMES = 64
 export const STANCE = 0.24
 export const CONTACT_X = 5
 const STRIKE_TILT = -0.08
-const PUSH_TILT = 0.38
+const PUSH_TILT = 0.36
 const FLAT_AT = 0.08
 const ROLL_AT = 0.14
 export const RECOVERY_KEYS = [STANCE, 0.43, 0.64, 0.83, 1]
@@ -128,7 +128,7 @@ export function runPose(phase) {
   }
   // Counter the thigh drive, which peaks before contact, rather than the
   // ankle contact clock. The old arms lagged the legs by a quarter cycle.
-  return { hip, near: leg(0), far: leg(0.5), arm: 0.95 * Math.sin(t * TAU - 0.55), lean: 0.19 }
+  return { hip, near: leg(0), far: leg(0.5), arm: 0.95 * Math.sin(t * TAU - 0.55), lean: 0.27 }
 }
 
 export const runFrame = phase => Math.floor(wrap(phase) * RUN_FRAMES) % RUN_FRAMES

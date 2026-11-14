@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { MODEL } from '../src/pixel/runnerModel.js'
 import { RunGait, RUN_STRIDE, STANCE, CONTACT_X, RECOVERY_KEYS, SHOE, runFrame, runPose, shinFootAngle } from '../src/pixel/runGait.js'
 
 const runner = speed => ({ state: 'run', speed })
@@ -55,8 +56,8 @@ describe('distance-driven run gait', () => {
       const phase = i / 1000, pose = runPose(phase)
       for (const [key, offset] of [['near', 0], ['far', 0.5]]) {
         const leg = pose[key]
-        expect(Math.hypot(leg.knee[0] - leg.hip[0], leg.knee[1] - leg.hip[1])).toBeCloseTo(10.7, 8)
-        expect(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1])).toBeCloseTo(10.3, 8)
+        expect(Math.hypot(leg.knee[0] - leg.hip[0], leg.knee[1] - leg.hip[1])).toBeCloseTo(MODEL.thigh, 8)
+        expect(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1])).toBeCloseTo(MODEL.shin, 8)
         const u = (phase + offset) % 1
         const soles = [SHOE.x, SHOE.x + SHOE.w].flatMap(x => [SHOE.y, SHOE.y + SHOE.h].map(y => leg.ankle[1] + x * Math.sin(leg.tilt) + y * Math.cos(leg.tilt)))
         expect(Math.max(...soles)).toBeLessThanOrEqual(1e-8)

@@ -9,9 +9,9 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 1.45,
     "offscreen.globalCompositeOperation=": 1.25,
-    "offscreen.drawImage": 19.29,
-    "offscreen.fillStyle=": 0.46,
-    "offscreen.fillRect": 0.46,
+    "offscreen.drawImage": 32.34,
+    "offscreen.fillStyle=": 0.74,
+    "offscreen.fillRect": 0.74,
     "offscreen.createLinearGradient": 0.04,
     "cachedSprites": 119
   },
@@ -25,9 +25,9 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.97,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 19.15,
-    "offscreen.fillStyle=": 0.4,
-    "offscreen.fillRect": 0.4,
+    "offscreen.drawImage": 32.18,
+    "offscreen.fillStyle=": 0.46,
+    "offscreen.fillRect": 0.46,
     "cachedSprites": 118
   },
   "endless-rain": {
@@ -40,9 +40,9 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.97,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 19.15,
-    "offscreen.fillStyle=": 0.4,
-    "offscreen.fillRect": 0.4,
+    "offscreen.drawImage": 32.18,
+    "offscreen.fillStyle=": 0.46,
+    "offscreen.fillRect": 0.46,
     "cachedSprites": 121
   },
   "heist": {
@@ -55,9 +55,9 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.92,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 19.2,
-    "offscreen.fillStyle=": 0.4,
-    "offscreen.fillRect": 0.4,
+    "offscreen.drawImage": 32.23,
+    "offscreen.fillStyle=": 0.67,
+    "offscreen.fillRect": 0.67,
     "cachedSprites": 132
   },
   "heist-rain-portrait": {
@@ -70,9 +70,9 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 0.9,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 19.16,
-    "offscreen.fillStyle=": 0.4,
-    "offscreen.fillRect": 0.4,
+    "offscreen.drawImage": 32.19,
+    "offscreen.fillStyle=": 1.03,
+    "offscreen.fillRect": 1.03,
     "cachedSprites": 103
   },
   "heist-alarm-focus": {
@@ -85,7 +85,7 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 1.17,
     "offscreen.globalCompositeOperation=": 1.21,
-    "offscreen.drawImage": 19.06,
+    "offscreen.drawImage": 32.07,
     "offscreen.fillStyle=": 0.4,
     "offscreen.fillRect": 0.4,
     "gpu.texSubImage2D": 1,
@@ -102,9 +102,9 @@
     "canvas.getImageData": 0,
     "offscreen.putImageData": 1.25,
     "offscreen.globalCompositeOperation=": 1.18,
-    "offscreen.drawImage": 19.2,
-    "offscreen.fillStyle=": 0.39,
-    "offscreen.fillRect": 0.39,
+    "offscreen.drawImage": 32.21,
+    "offscreen.fillStyle=": 0.72,
+    "offscreen.fillRect": 0.72,
     "cachedSprites": 125
   }
 }
